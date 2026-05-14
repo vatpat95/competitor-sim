@@ -1,0 +1,214 @@
+/**
+ * @typedef {{ competitorName: string, primaryResponse: object }} AgentRoundResponse
+ *
+ * @typedef {{
+ *   competitorName: string,
+ *   finalPrimaryResponse: object,
+ *   finalAlternativeResponse: object,
+ *   confidenceScore: number,
+ *   dataPointsDriving: string[]
+ * }} FinalResponse
+ */
+
+/**
+ * Builds the system prompt for a competitor agent, embedding the full scored profile.
+ *
+ * @param {object} profile - Output of buildCompetitorProfile()
+ * @returns {string}
+ */
+export function buildCompetitorSystemPrompt(profile) {
+  const {
+    name,
+    ebitdaMargin,
+    revenueGrowthRate,
+    cashPosition,
+    debtToEbitda,
+    financialCapacityScore,
+    aggressionIndex,
+    strategicIntentVector,
+    reactionPatternSummary,
+    constraintSummary,
+    signalSummary,
+  } = profile;
+
+  const capacityInterpretation =
+    financialCapacityScore >= 70
+      ? 'high — can sustain aggressive or prolonged competitive moves'
+      : financialCapacityScore >= 40
+      ? 'moderate — selective responses only; cannot sustain prolonged price wars'
+      : 'low — constrained to defensive or low-cost responses only';
+
+  const aggressionInterpretation =
+    aggressionIndex >= 70
+      ? 'highly aggressive — expect fast, large-magnitude responses'
+      : aggressionIndex >= 45
+      ? 'moderately aggressive — will respond selectively to direct threats'
+      : 'low aggression — prefers to hold position or respond gradually';
+
+  // Sort strategic intent dimensions highest to lowest, rendered as percentages
+  const intentLabels = {
+    growthMaximizer: 'Growth Maximizer (prioritizes volume and share above margin)',
+    marginDefender: 'Margin Defender (protects profitability; resists price erosion)',
+    nichePlayer: 'Niche Player (focuses on specific segments; avoids broad battles)',
+    innovationBetter: 'Innovation / Better Product (competes on features, not price)',
+  };
+
+  const sortedIntent = Object.entries(strategicIntentVector)
+    .sort(([, a], [, b]) => b - a)
+    .map(([dimension, score]) => {
+      const pct = (score * 100).toFixed(1);
+      return `  - ${intentLabels[dimension] ?? dimension}: ${pct}%`;
+    })
+    .join('\n');
+
+  return `You are the Chief Strategy Officer of ${name}. You make competitive decisions based on your company's actual data and constraints.
+
+---
+COMPANY FINANCIALS:
+- EBITDA Margin: ${ebitdaMargin}% | Revenue Growth: ${revenueGrowthRate}% YoY
+- Cash Position: ${cashPosition} | Debt-to-EBITDA: ${debtToEbitda}x
+
+COMPETITIVE SCORES:
+- Financial Capacity Score: ${financialCapacityScore}/100 → ${capacityInterpretation}
+- Aggression Index: ${aggressionIndex}/100 → ${aggressionInterpretation}
+
+STRATEGIC INTENT (ranked by dominance — these weights define how you make decisions):
+${sortedIntent}
+
+REACTION PATTERN: ${reactionPatternSummary}
+CONSTRAINTS: ${constraintSummary}
+RECENT INTELLIGENCE: ${signalSummary}
+---
+
+When responding to a competitive trigger, you MUST:
+1. Ground your response in your financial capacity — you cannot spend or cut beyond what your capacity score allows
+2. Act consistently with your strategic priorities — a margin defender does not suddenly become a price warrior
+3. Consider your constraints — they are real limits, not suggestions
+4. Reference specific real numbers (margins, growth rates, debt levels) when explaining your decision
+
+LANGUAGE RULES — these are strict:
+- Write rationale as a business executive speaking to their board, not as an analyst citing a model
+- Never use scoring jargon: no "intent vector", "aggression index", "capacity score", "strategic weight", "Growth Maximizer", "Margin Defender"
+- ALWAYS include the actual numbers — but embed them in plain English sentences
+  - Good: "We grew revenue 18.5% last year, so protecting that momentum matters more than margin right now"
+  - Bad: "Growth Maximizer intent at 55.6% dominates our response calculus"
+  - Bad: "Our strong cash position gives us flexibility" (no number — useless)
+  - Good: "With only 1.8x debt-to-EBITDA and strong cash reserves, we can absorb a price investment without financial strain"
+- The numbers build credibility — never drop them, just frame them in plain English
+- dataPointsDriving items must be plain facts with real numbers: e.g. "Revenue up 18.5% last year — we have momentum to protect", "Margins at 12.3% — thin enough that a price war would hurt us", "400 new sales reps hired in Q4 — we have the feet on the street to act fast"
+- watchSignal must be a concrete observable event with a clear threshold: "If [specific measurable thing] happens, we would [specific change to response]"
+
+Respond ONLY with valid JSON in this exact shape:
+{
+  "primaryResponse": {
+    "type": "price_cut"|"price_hold"|"price_increase"|"bundle_add"|"marketing_surge"|"niche_pivot"|"alliance"|"no_response",
+    "magnitude": number (0-30, percentage change or intensity 0-10 for non-price),
+    "timing": "immediate"|"within_30_days"|"within_quarter"|"wait_and_see",
+    "rationale": string (2-3 plain-English sentences explaining why, using real numbers not score names)
+  },
+  "alternativeResponse": { same shape, the second most likely move },
+  "keyAssumption": string (one plain-English sentence: "We are assuming that...")
+  "confidenceScore": number (0-100),
+  "dataPointsDriving": string[] (exactly 3 items — plain facts with real numbers, no score terminology),
+  "watchSignal": string ("If [observable event], we would [change our response]")
+}
+No markdown, no explanation outside the JSON.`;
+}
+
+/**
+ * Builds the user message for rounds 2 and 3 of a simulation, including competitor round-1 moves.
+ *
+ * @param {string} triggerEvent - Description of the competitive trigger
+ * @param {object} profile - Output of buildCompetitorProfile() for this agent
+ * @param {AgentRoundResponse[]} otherAgentsResponses - Round-1 responses from all other competitors
+ * @returns {string}
+ */
+export function buildCompetitorRoundPrompt(triggerEvent, profile, otherAgentsResponses) {
+  const competitorMoves = otherAgentsResponses
+    .map(({ competitorName, primaryResponse }) => {
+      const { type, magnitude, timing } = primaryResponse;
+      return `  - ${competitorName}: ${type} | magnitude ${magnitude} | ${timing}`;
+    })
+    .join('\n');
+
+  return `TRIGGER EVENT: ${triggerEvent}
+
+MARKET UPDATE — your competitors have made the following moves:
+${competitorMoves}
+
+Given these market dynamics now unfolding, reconsider your position.
+Does your round-1 response change? If so, explain why using your profile data.
+If not, explain why you are holding your position.
+Respond in the same JSON format.`;
+}
+
+/**
+ * Builds the user message for the orchestrator agent to synthesize all competitor final responses.
+ *
+ * @param {string} triggerEvent - Description of the competitive trigger
+ * @param {FinalResponse[]} allFinalResponses - Final responses from all competitor agents
+ * @param {{ name: string, strategicMove: string }} yourCompanyContext - The player's company and move
+ * @returns {string}
+ */
+export function buildOrchestratorPrompt(triggerEvent, allFinalResponses, yourCompanyContext) {
+  const competitorSummaries = allFinalResponses
+    .map(({ competitorName, finalPrimaryResponse, finalAlternativeResponse, confidenceScore, dataPointsDriving }) => {
+      return [
+        `  ${competitorName}:`,
+        `    Primary: ${finalPrimaryResponse.type} | magnitude ${finalPrimaryResponse.magnitude} | ${finalPrimaryResponse.timing}`,
+        `    Rationale: ${finalPrimaryResponse.rationale}`,
+        `    Alternative: ${finalAlternativeResponse.type} | magnitude ${finalAlternativeResponse.magnitude} | ${finalAlternativeResponse.timing}`,
+        `    Confidence: ${confidenceScore}/100`,
+        `    Key data points: ${dataPointsDriving.join(' | ')}`,
+      ].join('\n');
+    })
+    .join('\n\n');
+
+  return `TRIGGER EVENT: ${triggerEvent}
+
+YOUR COMPANY: ${yourCompanyContext.name}
+YOUR STRATEGIC MOVE: ${yourCompanyContext.strategicMove}
+
+COMPETITOR FINAL RESPONSES:
+${competitorSummaries}
+
+Your audience is a senior executive or board member who has 60 seconds to read this. Write everything in plain, direct English.
+
+STRICT LANGUAGE RULES:
+- Write for a senior executive who has 60 seconds and wants to know what to do and why
+- No scoring jargon: no "strategic intent vector", "capacity score", "ARPU compression", "Growth Maximizer"
+- ALWAYS include actual numbers — they are what makes the analysis credible and trustworthy
+  - Good: "ValueNet grew 18.5% last year and just hired 400 sales reps — they will move fast"
+  - Bad: "Given ValueNet's high growth trajectory and capacity investment..." (vague, no numbers)
+  - Good: "RegionalPlus carries 4.2x debt and has weak cash — they simply cannot afford to cut prices"
+  - Bad: "RegionalPlus faces significant financial constraints limiting their response options"
+- Numbers + plain English together = credibility. Never one without the other.
+- Be direct and opinionated — say "do X by [date]" not "consider whether X might be appropriate"
+- For player outcomes: 1-2 plain sentences about what actually happens and why, with a number or fact to anchor it
+- For scenarios: describe what a customer, salesperson, or CFO would actually see and experience
+- For watchlist signals: "Watch for [specific observable thing] — if it happens, it means [plain implication with a number if possible] and you should [concrete action]"
+- For key risks: "Risk: [what could go wrong, with numbers] → [plain consequence]"
+
+Synthesize these competitive dynamics and respond ONLY with valid JSON in this exact shape:
+{
+  "marketEquilibrium": string (2-3 plain sentences: paint a picture of what the market looks like 90 days from now after all these moves play out — what does a customer or salesperson actually see?),
+  "playerOutcomes": {
+    "yourCompany": { "outcome": "wins"|"neutral"|"loses", "reasoning": string (1-2 plain sentences about what actually happens to this company) },
+    "[competitorName for each competitor]": { "outcome": "wins"|"neutral"|"loses", "reasoning": string }
+  },
+  "strategicRecommendation": string (3-5 clear sentences. Start with the single most important thing to do NOW. Then the second priority. Be specific about timing and why. Write like you are the most trusted advisor in the room.),
+  "betterAlternative": {
+    "move": string (a clear, specific move in plain English — not a category name),
+    "reasoning": string (why this beats the current plan — use plain cause-and-effect),
+    "expectedOutcome": string (what concretely happens if they do this)
+  },
+  "confidenceBands": {
+    "bestCase": { "description": string (what success actually looks like — specific outcomes, not abstractions), "conditions": string (2-3 concrete things that would need to be true) },
+    "likelyCase": { "description": string (the realistic outcome most people should plan for), "conditions": string },
+    "worstCase": { "description": string (what a bad outcome actually looks like), "conditions": string }
+  },
+  "keyRisks": string[] (max 4, each written as "Risk: [what could go wrong] → [plain consequence]"),
+  "watchlistSignals": string[] (max 5, each written as "Watch for [specific observable thing] — if it happens, [plain implication and action]")
+}
+No markdown, no explanation outside the JSON.`;
+}
