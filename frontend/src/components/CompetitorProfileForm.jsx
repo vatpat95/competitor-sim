@@ -70,20 +70,23 @@ function computeScores(c) {
 
 function SectionHeader({ title }) {
   return (
-    <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-3 mt-6 first:mt-0">
-      {title}
-    </h3>
+    <div className="flex items-center gap-2 mt-6 mb-3 first:mt-0">
+      <div className="w-1 h-4 rounded-full" style={{ background: '#0ea5e9' }} />
+      <h3 className="text-xs font-bold uppercase tracking-wider" style={{ color: '#4a7fa5' }}>{title}</h3>
+    </div>
   )
 }
 
 function FieldRow({ label, children }) {
   return (
     <div className="flex flex-col gap-1 mb-3">
-      <label className="text-sm font-medium text-gray-700">{label}</label>
+      <label className="text-sm font-medium text-gray-300">{label}</label>
       {children}
     </div>
   )
 }
+
+const sharedInputCls = 'w-full px-3 py-2.5 bg-gray-900 border border-gray-700 rounded-lg text-sm text-gray-100 placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent transition-colors'
 
 function NumInput({ value, onChange, step = 0.1, min = 0, placeholder = '0' }) {
   return (
@@ -94,14 +97,14 @@ function NumInput({ value, onChange, step = 0.1, min = 0, placeholder = '0' }) {
       step={step}
       min={min}
       placeholder={placeholder}
-      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+      className={sharedInputCls}
     />
   )
 }
 
 function ToggleGroup({ options, value, onChange }) {
   return (
-    <div className="flex rounded-lg border border-gray-200 overflow-hidden">
+    <div className="flex rounded-lg overflow-hidden" style={{ border: '1px solid #374151' }}>
       {options.map(opt => (
         <button
           key={opt.value}
@@ -109,8 +112,9 @@ function ToggleGroup({ options, value, onChange }) {
           onClick={() => onChange(opt.value)}
           className={[
             'flex-1 py-2 text-sm font-medium transition-colors',
-            value === opt.value ? opt.activeClass : 'bg-white text-gray-500 hover:bg-gray-50',
+            value === opt.value ? opt.activeClass : 'text-gray-500 hover:text-gray-300',
           ].join(' ')}
+          style={value !== opt.value ? { background: '#111827' } : undefined}
         >
           {opt.label}
         </button>
@@ -165,40 +169,40 @@ function LiveScoreCard({ scores }) {
   const topMeta = INTENT_META[topIntent?.[0]] ?? {}
 
   return (
-    <div className="sticky top-6 bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
-      <div className="px-4 pt-4 pb-2 border-b border-gray-100">
-        <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-400">Competitor Profile</h3>
+    <div className="sticky top-6 rounded-xl overflow-hidden" style={{ background: '#0f172a', border: '1px solid #1e3a5f' }}>
+      <div className="px-4 pt-4 pb-2" style={{ borderBottom: '1px solid #1e3a5f' }}>
+        <h3 className="text-xs font-bold uppercase tracking-widest" style={{ color: '#4a7fa5' }}>Live Scoring</h3>
       </div>
 
       {/* Financial Capacity */}
-      <div className="px-4 py-3 border-b border-gray-100">
+      <div className="px-4 py-3" style={{ borderBottom: '1px solid #1e3a5f' }}>
         <div className="flex items-baseline justify-between mb-1">
           <span className="text-xs font-medium text-gray-500">Financial firepower</span>
-          <span className="text-xs font-bold text-gray-700">{financialCapacityScore.toFixed(0)}/100</span>
+          <span className="text-xs font-bold text-gray-300">{financialCapacityScore.toFixed(0)}/100</span>
         </div>
         <ScoreBar value={financialCapacityScore} colorClass={cap.bar} />
         <div className="mt-1.5">
           <span className={`text-xs font-semibold ${cap.color}`}>{cap.label}</span>
-          <p className="text-xs text-gray-400 leading-snug mt-0.5">{cap.sub}</p>
+          <p className="text-xs text-gray-500 leading-snug mt-0.5">{cap.sub}</p>
         </div>
-        <div className="flex justify-between text-[10px] text-gray-300 mt-1.5">
+        <div className="flex justify-between text-[10px] text-gray-600 mt-1.5">
           <span>0 — Can't compete</span>
           <span>100 — Deep pockets</span>
         </div>
       </div>
 
       {/* Aggression Index */}
-      <div className="px-4 py-3 border-b border-gray-100">
+      <div className="px-4 py-3" style={{ borderBottom: '1px solid #1e3a5f' }}>
         <div className="flex items-baseline justify-between mb-1">
           <span className="text-xs font-medium text-gray-500">Likely to fight back?</span>
-          <span className="text-xs font-bold text-gray-700">{aggressionIndex.toFixed(0)}/100</span>
+          <span className="text-xs font-bold text-gray-300">{aggressionIndex.toFixed(0)}/100</span>
         </div>
         <ScoreBar value={aggressionIndex} colorClass={agg.bar} />
         <div className="mt-1.5">
           <span className={`text-xs font-semibold ${agg.color}`}>{agg.label}</span>
-          <p className="text-xs text-gray-400 leading-snug mt-0.5">{agg.sub}</p>
+          <p className="text-xs text-gray-500 leading-snug mt-0.5">{agg.sub}</p>
         </div>
-        <div className="flex justify-between text-[10px] text-gray-300 mt-1.5">
+        <div className="flex justify-between text-[10px] text-gray-600 mt-1.5">
           <span>0 — Passive</span>
           <span>100 — Very aggressive</span>
         </div>
@@ -216,19 +220,19 @@ function LiveScoreCard({ scores }) {
             return (
               <div key={key} className="mb-2.5">
                 <div className="flex items-baseline justify-between mb-1">
-                  <span className={`text-xs ${isTop ? 'font-semibold text-gray-700' : 'text-gray-500'}`}>
+                  <span className={`text-xs ${isTop ? 'font-semibold text-gray-200' : 'text-gray-500'}`}>
                     {meta.label}
                   </span>
-                  <span className={`text-xs font-bold ${isTop ? 'text-gray-800' : 'text-gray-400'}`}>{pct}%</span>
+                  <span className={`text-xs font-bold ${isTop ? 'text-gray-100' : 'text-gray-600'}`}>{pct}%</span>
                 </div>
                 <ScoreBar value={val} colorClass={meta.color} showPct />
                 {isTop && (
-                  <p className="text-[10px] text-gray-400 mt-0.5 leading-snug">{meta.desc}</p>
+                  <p className="text-[10px] text-gray-500 mt-0.5 leading-snug">{meta.desc}</p>
                 )}
               </div>
             )
           })}
-        <p className="text-[10px] text-gray-300 mt-2 leading-snug">
+        <p className="text-[10px] text-gray-600 mt-2 leading-snug">
           Dominant strategy shapes how the AI models this competitor's decisions.
         </p>
       </div>
@@ -293,7 +297,7 @@ export default function CompetitorProfileForm({ competitor, onChange, index }) {
             value={competitor.name || ''}
             onChange={e => update('name', e.target.value)}
             placeholder="e.g. ValueNet"
-            className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className={sharedInputCls}
           />
         </FieldRow>
 
@@ -320,9 +324,9 @@ export default function CompetitorProfileForm({ competitor, onChange, index }) {
             value={competitor.cashPosition}
             onChange={v => update('cashPosition', v)}
             options={[
-              { value: 'strong',   label: 'Strong',   activeClass: 'bg-green-100 text-green-700 font-semibold' },
-              { value: 'moderate', label: 'Moderate', activeClass: 'bg-amber-100 text-amber-700 font-semibold' },
-              { value: 'weak',     label: 'Weak',     activeClass: 'bg-red-100 text-red-700 font-semibold' },
+              { value: 'strong',   label: 'Strong',   activeClass: 'bg-emerald-900 text-emerald-300 font-semibold' },
+              { value: 'moderate', label: 'Moderate', activeClass: 'bg-amber-900 text-amber-300 font-semibold' },
+              { value: 'weak',     label: 'Weak',     activeClass: 'bg-red-900 text-red-300 font-semibold' },
             ]}
           />
         </FieldRow>
@@ -331,7 +335,7 @@ export default function CompetitorProfileForm({ competitor, onChange, index }) {
         <SectionHeader title="Pricing Behavior (most recent first)" />
 
         {moves.length === 0 && (
-          <p className="text-sm text-gray-400 mb-3">No price moves added yet.</p>
+          <p className="text-sm text-gray-600 mb-3">No price moves added yet.</p>
         )}
 
         {moves.map((move, i) => (
@@ -339,7 +343,8 @@ export default function CompetitorProfileForm({ competitor, onChange, index }) {
             <select
               value={move.direction}
               onChange={e => updateMove(i, 'direction', e.target.value)}
-              className="px-2 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+              className="px-2 py-2.5 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 text-gray-200"
+              style={{ background: '#111827', border: '1px solid #374151' }}
             >
               <option value="down">Price cut</option>
               <option value="hold">Price hold</option>
@@ -353,19 +358,21 @@ export default function CompetitorProfileForm({ competitor, onChange, index }) {
               placeholder="% mag"
               step="0.1"
               min="0"
-              className="w-20 px-2 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50 disabled:text-gray-400"
+              className="w-20 px-2 py-2.5 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 text-gray-200"
+              style={{ background: move.direction === 'hold' ? '#0d1117' : '#111827', border: '1px solid #374151', color: move.direction === 'hold' ? '#4b5563' : undefined }}
             />
             <input
               type="text"
               value={move.context}
               onChange={e => updateMove(i, 'context', e.target.value)}
               placeholder="Brief context"
-              className="flex-1 px-2 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="flex-1 px-2 py-2.5 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 text-gray-200 placeholder-gray-600"
+              style={{ background: '#111827', border: '1px solid #374151' }}
             />
             <button
               type="button"
               onClick={() => removeMove(i)}
-              className="px-2 py-2 text-gray-400 hover:text-red-500 transition-colors text-sm"
+              className="px-2 py-2 text-gray-600 hover:text-red-400 transition-colors text-sm"
             >
               ✕
             </button>
@@ -376,7 +383,8 @@ export default function CompetitorProfileForm({ competitor, onChange, index }) {
           <button
             type="button"
             onClick={addMove}
-            className="text-sm text-blue-600 hover:text-blue-700 font-medium mt-1"
+            className="text-sm font-medium mt-1 transition-colors"
+            style={{ color: '#0ea5e9' }}
           >
             + Add move
           </button>
@@ -390,9 +398,9 @@ export default function CompetitorProfileForm({ competitor, onChange, index }) {
             value={competitor.marketShareTrend}
             onChange={v => update('marketShareTrend', v)}
             options={[
-              { value: 'gaining', label: 'Gaining', activeClass: 'bg-green-100 text-green-700 font-semibold' },
-              { value: 'stable',  label: 'Stable',  activeClass: 'bg-blue-100 text-blue-700 font-semibold' },
-              { value: 'losing',  label: 'Losing',  activeClass: 'bg-red-100 text-red-700 font-semibold' },
+              { value: 'gaining', label: 'Gaining', activeClass: 'bg-emerald-900 text-emerald-300 font-semibold' },
+              { value: 'stable',  label: 'Stable',  activeClass: 'bg-sky-900 text-sky-300 font-semibold' },
+              { value: 'losing',  label: 'Losing',  activeClass: 'bg-red-900 text-red-300 font-semibold' },
             ]}
           />
         </FieldRow>
@@ -402,9 +410,9 @@ export default function CompetitorProfileForm({ competitor, onChange, index }) {
             value={competitor.headcountTrend}
             onChange={v => update('headcountTrend', v)}
             options={[
-              { value: 'growing',   label: 'Growing',   activeClass: 'bg-green-100 text-green-700 font-semibold' },
-              { value: 'flat',      label: 'Flat',      activeClass: 'bg-blue-100 text-blue-700 font-semibold' },
-              { value: 'shrinking', label: 'Shrinking', activeClass: 'bg-red-100 text-red-700 font-semibold' },
+              { value: 'growing',   label: 'Growing',   activeClass: 'bg-emerald-900 text-emerald-300 font-semibold' },
+              { value: 'flat',      label: 'Flat',      activeClass: 'bg-sky-900 text-sky-300 font-semibold' },
+              { value: 'shrinking', label: 'Shrinking', activeClass: 'bg-red-900 text-red-300 font-semibold' },
             ]}
           />
         </FieldRow>
@@ -415,7 +423,7 @@ export default function CompetitorProfileForm({ competitor, onChange, index }) {
             value={competitor.geographicFocus || ''}
             onChange={e => update('geographicFocus', e.target.value)}
             placeholder="e.g. North America, expanding EMEA"
-            className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className={sharedInputCls}
           />
         </FieldRow>
 
@@ -428,7 +436,7 @@ export default function CompetitorProfileForm({ competitor, onChange, index }) {
             onChange={e => update('ceoPriorityStatement', e.target.value)}
             rows={4}
             placeholder="Paste or paraphrase from their last earnings call or investor day"
-            className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+            className={`${sharedInputCls} resize-none`}
           />
         </FieldRow>
 
@@ -440,12 +448,13 @@ export default function CompetitorProfileForm({ competitor, onChange, index }) {
                 value={signal}
                 onChange={e => updateSignal(i, e.target.value)}
                 placeholder={`Signal ${i + 1}`}
-                className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className={`flex-1 px-3 py-2.5 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 text-gray-200 placeholder-gray-600`}
+                style={{ background: '#111827', border: '1px solid #374151' }}
               />
               <button
                 type="button"
                 onClick={() => removeSignal(i)}
-                className="px-2 text-gray-400 hover:text-red-500 transition-colors text-sm"
+                className="px-2 text-gray-600 hover:text-red-400 transition-colors text-sm"
               >
                 ✕
               </button>
@@ -455,7 +464,8 @@ export default function CompetitorProfileForm({ competitor, onChange, index }) {
             <button
               type="button"
               onClick={addSignal}
-              className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+              className="text-sm font-medium transition-colors"
+              style={{ color: '#0ea5e9' }}
             >
               + Add signal
             </button>
@@ -468,7 +478,7 @@ export default function CompetitorProfileForm({ competitor, onChange, index }) {
             onChange={e => update('regulatoryConstraints', e.target.value)}
             rows={2}
             placeholder="Any regulatory, legal, or structural limits on their competitive response"
-            className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+            className={`${sharedInputCls} resize-none`}
           />
         </FieldRow>
       </div>

@@ -1,15 +1,15 @@
 # CompetitorSim
 
-AI-powered competitive response simulator. Enter your strategic move and your competitors' financial and behavioural profiles — CompetitorSim models how each competitor will react across multiple rounds of reasoning, then synthesises a strategic recommendation for your company.
+AI-powered competitive response simulator. Enter your strategic move and your competitors' financial and behavioural profiles — CompetitorSim models how each competitor will react across multiple rounds of reasoning, then delivers a verdict and strategic recommendation via a consultant-style dashboard.
 
 ---
 
 ## What it does
 
-1. **Profile your competitors** — input financial data (margins, debt, cash), pricing history, market position, and qualitative signals (CEO statements, recent news)
+1. **Profile your competitors** — input financial data (margins, debt, cash), pricing history, market position, and qualitative signals (CEO statements, recent news). A live scorecard updates in real time as you type.
 2. **Define your move** — a price cut, product launch, market entry, or any strategic trigger
 3. **Run the simulation** — three AI agents (one per competitor) independently decide how to respond, then observe each other's moves and reconsider. An orchestrator agent synthesises the final competitive landscape
-4. **Get a recommendation** — plain-English strategic advice with specific numbers, scenario outcomes (best/likely/worst), key risks, and actionable watchlist signals
+4. **Get a verdict** — PROCEED / PROCEED WITH CAUTION / REVISE STRATEGY, with a full consultant-style dashboard: strategic recommendation, competitive response matrix, scenario range, sensitivity sliders, and prioritised watchlist
 
 ---
 
@@ -78,26 +78,31 @@ Open [http://localhost:5173](http://localhost:5173) in your browser.
 
 ### Quick start with demo data
 
-1. Go to the **Scenario Setup** tab
-2. Click **Load Demo Data** — this populates a telecom scenario with three competitors (ValueNet, PremiumConnect, RegionalPlus)
-3. Click the **Run Simulation** tab — the simulation fires automatically (~30–60 seconds)
-4. Read the results dashboard
+1. Open the **Scenario Setup** tab (step 01)
+2. Click **Load Demo** — populates the TelcoX telecom scenario with three competitors (ValueNet, PremiumConnect, RegionalPlus)
+3. Step to **Competitor Profiles** (step 02), then click **Run Simulation →**
+4. The results dashboard loads automatically (~30–60 seconds)
 
 ### Custom scenario
 
-1. **Scenario Setup** — enter your company name, your strategic move, and optional context
-2. **Competitor Profiles** — fill in data for up to 3 competitors. The live scorecard on the right updates as you type, showing financial firepower, aggression level, and dominant strategy
-3. **Run Simulation** — click the tab to run. Watch the multi-step progress display
+1. **01 — Scenario Setup** — enter your company name, strategic move, and optional context
+2. **02 — Competitor Profiles** — fill in data for up to 3 competitors. The live scorecard on the right updates instantly, showing financial firepower, aggression index, and dominant strategic intent
+3. **03 — Run Simulation** — click the tab to fire the simulation and view the results dashboard
 
-### Sensitivity analysis
+### Reading the results dashboard
 
-After results load, use the **Adjust assumptions** panel to drag sliders and see how outcomes shift:
-- Change a competitor's financial strength
-- Adjust your price cut magnitude
-- Change the market growth rate
-- Toggle a regulatory pricing cap
+The dashboard is structured as a management consultant briefing:
 
-Each change re-runs the full simulation with modified parameters.
+| Section | What it shows |
+|---------|--------------|
+| **Verdict Banner** | PROCEED / PROCEED WITH CAUTION / REVISE STRATEGY — color-coded based on your outcome and whether a better move was identified |
+| **Strategic Recommendation** | Plain-English advice. If a better alternative exists, it's shown with rationale and expected outcome. |
+| **Market Equilibrium** | How the market settles, with outcome labels (Wins / Breaks Even / Loses) per player |
+| **Competitive Response Matrix** | Table: each competitor's expected move, timing, threat level (HIGH/MEDIUM/LOW), and implication for you |
+| **Scenario Range** | Best Case / Base Case / Worst Case with conditions for each |
+| **Sensitivity Analysis** | Drag sliders to re-run with modified assumptions in real time |
+| **Watchpoints** | Signals to monitor + key risks |
+| **Round-by-round reasoning** | Collapsible supporting detail — collapsed by default |
 
 ---
 
@@ -140,12 +145,18 @@ competitor-sim/
 │   ├── test-prompts.js       Prompt generation tests
 │   ├── test-simulation.js    Full live simulation test
 │   └── test-e2e.js           End-to-end API test
-└── frontend/
-    └── src/
-        ├── App.jsx                        App shell, state, API call
-        └── components/
-            ├── CompetitorProfileForm.jsx  Data entry + live scorecard
-            └── SimulationResults.jsx      Results dashboard
+├── frontend/
+│   ├── index.html            Entry — title: "Competitor Simulator"
+│   └── src/
+│       ├── index.css                      Global styles (dark theme base)
+│       ├── App.jsx                        App shell, 3-tab workflow, state, API call
+│       └── components/
+│           ├── CompetitorProfileForm.jsx  Data entry + live scorecard
+│           └── SimulationResults.jsx      Consultant-style results dashboard
+└── docs/
+    ├── CompetitorSim_Executive_Deck.pptx
+    ├── CompetitorSim_Technical_Documentation.docx
+    └── Whitepaper_With_ProofOfConcept.docx
 ```
 
 ---

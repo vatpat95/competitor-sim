@@ -107,13 +107,13 @@ const DEMO_COMPETITORS = [
 
 function TabBar({ activeTab, setActiveTab, canRunSim }) {
   const tabs = [
-    { id: 'setup',       label: 'Scenario Setup' },
-    { id: 'competitors', label: 'Competitor Profiles' },
-    { id: 'simulate',    label: 'Run Simulation', requiresReady: true },
+    { id: 'setup',       label: 'Scenario Setup',      step: '01' },
+    { id: 'competitors', label: 'Competitor Profiles',  step: '02' },
+    { id: 'simulate',    label: 'Run Simulation',       step: '03', requiresReady: true },
   ]
 
   return (
-    <div className="flex border-b border-gray-200">
+    <div className="flex border-b border-gray-800">
       {tabs.map(tab => {
         const disabled = tab.requiresReady && !canRunSim
         const isActive = activeTab === tab.id
@@ -123,15 +123,21 @@ function TabBar({ activeTab, setActiveTab, canRunSim }) {
             disabled={disabled}
             onClick={() => !disabled && setActiveTab(tab.id)}
             className={[
-              'px-6 py-3 text-sm font-medium border-b-2 transition-colors',
+              'relative flex items-center gap-2.5 px-6 py-4 text-sm font-medium transition-colors border-b-2',
               isActive
-                ? 'border-blue-600 text-blue-600'
-                : 'border-transparent text-gray-500',
+                ? 'border-sky-400 text-white bg-gray-900/50'
+                : 'border-transparent text-gray-400',
               disabled
-                ? 'opacity-40 cursor-not-allowed'
-                : 'hover:text-gray-700 hover:border-gray-300 cursor-pointer',
+                ? 'opacity-30 cursor-not-allowed'
+                : 'hover:text-gray-200 hover:bg-gray-900/30 cursor-pointer',
             ].join(' ')}
           >
+            <span className={[
+              'text-xs font-bold font-mono w-6 h-6 rounded flex items-center justify-center shrink-0',
+              isActive ? 'bg-sky-400 text-gray-900' : 'bg-gray-800 text-gray-500',
+            ].join(' ')}>
+              {tab.step}
+            </span>
             {tab.label}
           </button>
         )
@@ -143,9 +149,9 @@ function TabBar({ activeTab, setActiveTab, canRunSim }) {
 function Field({ label, children, hint }) {
   return (
     <div className="flex flex-col gap-1">
-      <label className="text-sm font-medium text-gray-700">{label}</label>
+      <label className="text-sm font-medium text-gray-200">{label}</label>
       {children}
-      {hint && <p className="text-xs text-gray-400">{hint}</p>}
+      {hint && <p className="text-xs text-gray-500">{hint}</p>}
     </div>
   )
 }
@@ -155,18 +161,20 @@ function ScenarioSetupTab({ yourCompany, setYourCompany, onLoadDemo }) {
     setYourCompany(prev => ({ ...prev, [key]: value }))
   }
 
+  const inputCls = 'w-full px-3 py-2.5 bg-gray-900 border border-gray-700 rounded-lg text-sm text-gray-100 placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent transition-colors'
+
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-start justify-between gap-4">
         <div>
-          <h2 className="text-lg font-semibold text-gray-900">Your Company & Strategic Move</h2>
-          <p className="text-sm text-gray-500 mt-0.5">Define the competitive trigger you want to simulate.</p>
+          <h2 className="text-base font-semibold text-white">Your Company &amp; Strategic Move</h2>
+          <p className="text-sm text-gray-400 mt-0.5">Define the competitive trigger you want to simulate.</p>
         </div>
         <button
           onClick={onLoadDemo}
-          className="px-4 py-2 text-sm font-medium text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50 transition-colors"
+          className="shrink-0 px-4 py-2 text-sm font-medium text-sky-400 border border-sky-800 rounded-lg hover:bg-sky-950 transition-colors"
         >
-          Load Demo Data
+          Load Demo
         </button>
       </div>
 
@@ -177,7 +185,7 @@ function ScenarioSetupTab({ yourCompany, setYourCompany, onLoadDemo }) {
             value={yourCompany.name}
             onChange={e => update('name', e.target.value)}
             placeholder="e.g. TelcoX"
-            className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className={inputCls}
           />
         </Field>
 
@@ -190,7 +198,7 @@ function ScenarioSetupTab({ yourCompany, setYourCompany, onLoadDemo }) {
             value={yourCompany.strategicMove}
             onChange={e => update('strategicMove', e.target.value)}
             placeholder="e.g. 10% price cut on core unlimited plan"
-            className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className={inputCls}
           />
         </Field>
 
@@ -203,19 +211,19 @@ function ScenarioSetupTab({ yourCompany, setYourCompany, onLoadDemo }) {
             onChange={e => update('context', e.target.value)}
             placeholder="e.g. Attempting to gain market share in urban markets ahead of Q3 budget season"
             rows={3}
-            className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+            className={`${inputCls} resize-none`}
           />
         </Field>
       </div>
 
       {yourCompany.name && yourCompany.strategicMove && (
-        <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
-          <p className="text-sm text-green-700">
-            <span className="font-medium">{yourCompany.name}</span> is announcing:{' '}
-            <span className="italic">{yourCompany.strategicMove}</span>
+        <div className="p-4 bg-emerald-950 border border-emerald-800 rounded-lg">
+          <p className="text-sm text-emerald-300">
+            <span className="font-semibold">{yourCompany.name}</span> is announcing:{' '}
+            <span className="italic text-emerald-200">{yourCompany.strategicMove}</span>
           </p>
-          <p className="text-xs text-green-600 mt-1">
-            Ready — go to Competitor Profiles to configure who will react.
+          <p className="text-xs text-emerald-500 mt-1">
+            Ready — proceed to Competitor Profiles.
           </p>
         </div>
       )}
@@ -245,26 +253,26 @@ function LoadingPanel() {
   }, [])
 
   return (
-    <div className="py-8 space-y-4">
-      <p className="text-sm font-medium text-gray-500 mb-6">Simulation running — this takes ~20–40 seconds.</p>
+    <div className="py-10 space-y-4">
+      <p className="text-sm font-medium text-gray-500 mb-8 uppercase tracking-wider text-xs">Simulation running — 20–40 seconds</p>
       {STEPS.map((step, i) => {
         const done = i < reached
         const active = i === reached
         return (
-          <div key={i} className="flex items-center gap-3">
+          <div key={i} className="flex items-center gap-4">
             <div className={[
-              'w-5 h-5 rounded-full flex items-center justify-center shrink-0 text-xs font-bold transition-all',
-              done   ? 'bg-green-500 text-white' :
-              active ? 'bg-blue-500 text-white animate-pulse' :
-                       'bg-gray-100 text-gray-300',
+              'w-7 h-7 rounded-full flex items-center justify-center shrink-0 text-xs font-bold transition-all',
+              done   ? 'bg-emerald-500 text-white' :
+              active ? 'bg-sky-500 text-white animate-pulse' :
+                       'bg-gray-800 text-gray-600',
             ].join(' ')}>
               {done ? '✓' : i + 1}
             </div>
             <span className={[
               'text-sm transition-colors',
-              done   ? 'text-green-600 font-medium' :
-              active ? 'text-blue-600 font-medium' :
-                       'text-gray-300',
+              done   ? 'text-emerald-400 font-medium' :
+              active ? 'text-sky-300 font-medium' :
+                       'text-gray-600',
             ].join(' ')}>
               {step.label}
             </span>
@@ -278,7 +286,6 @@ function LoadingPanel() {
 function SimulateTab({ isLoading, error, simulationResult, onRun, onRerun, onBack, yourCompany, competitors }) {
   const filledCompetitors = competitors.filter(c => c.name.trim())
 
-  // Auto-run when tab is first shown and not yet loading/done
   const hasRun = useRef(false)
   useEffect(() => {
     if (!hasRun.current && !isLoading && !simulationResult && !error) {
@@ -291,24 +298,24 @@ function SimulateTab({ isLoading, error, simulationResult, onRun, onRerun, onBac
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-lg font-semibold text-gray-900">Run Simulation</h2>
-          <p className="text-sm text-gray-500 mt-0.5">
+          <h2 className="text-base font-semibold text-white">Simulation Results</h2>
+          <p className="text-sm text-gray-400 mt-0.5">
             {yourCompany.name} · {filledCompetitors.length} competitor{filledCompetitors.length !== 1 ? 's' : ''}
           </p>
         </div>
         <div className="flex gap-2">
           <button
             onClick={onBack}
-            className="px-3 py-2 text-sm text-gray-500 hover:text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+            className="px-3 py-2 text-sm text-gray-400 hover:text-gray-200 border border-gray-700 rounded-lg hover:bg-gray-800 transition-colors"
           >
             ← Edit Scenario
           </button>
           {simulationResult && !isLoading && (
             <button
               onClick={onRerun}
-              className="px-3 py-2 text-sm font-medium text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50 transition-colors"
+              className="px-3 py-2 text-sm font-medium text-sky-400 border border-sky-800 rounded-lg hover:bg-sky-950 transition-colors"
             >
-              Re-run Simulation
+              Re-run
             </button>
           )}
         </div>
@@ -317,12 +324,12 @@ function SimulateTab({ isLoading, error, simulationResult, onRun, onRerun, onBac
       {isLoading && <LoadingPanel />}
 
       {error && !isLoading && (
-        <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
-          <p className="text-sm font-medium text-red-700">Simulation failed</p>
-          <p className="text-sm text-red-600 mt-1 font-mono">{error}</p>
+        <div className="p-4 bg-red-950 border border-red-800 rounded-lg">
+          <p className="text-sm font-semibold text-red-300">Simulation failed</p>
+          <p className="text-sm text-red-400 mt-1 font-mono">{error}</p>
           <button
             onClick={onRerun}
-            className="mt-3 px-3 py-1.5 text-sm font-medium text-red-600 border border-red-200 rounded-lg hover:bg-red-100 transition-colors"
+            className="mt-3 px-3 py-1.5 text-sm font-medium text-red-400 border border-red-800 rounded-lg hover:bg-red-900 transition-colors"
           >
             Try again
           </button>
@@ -386,19 +393,32 @@ export default function App() {
     setActiveTab('competitors')
   }
 
+  const inputCls = 'w-full px-3 py-2.5 bg-gray-900 border border-gray-700 rounded-lg text-sm text-gray-100 placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent transition-colors'
+
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen" style={{ background: '#0d1117' }}>
       {/* Header */}
-      <header className="bg-white border-b border-gray-200">
-        <div className="max-w-4xl mx-auto px-6 py-4">
-          <h1 className="text-xl font-bold text-gray-900">CompetitorSim</h1>
-          <p className="text-sm text-gray-500">AI-powered competitive response simulation</p>
+      <header style={{ background: '#0b1426', borderBottom: '1px solid #1e3a5f' }}>
+        <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg flex items-center justify-center font-bold text-sm" style={{ background: 'linear-gradient(135deg, #0ea5e9, #2563eb)', color: 'white' }}>
+              CS
+            </div>
+            <div>
+              <h1 className="text-base font-bold text-white tracking-tight">CompetitorSim</h1>
+              <p className="text-xs" style={{ color: '#4a7fa5' }}>Strategic Intelligence Platform</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+            <span className="text-xs text-gray-500">AI Engine Active</span>
+          </div>
         </div>
       </header>
 
       {/* Main */}
-      <main className="max-w-4xl mx-auto px-6 py-6">
-        <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+      <main className="max-w-6xl mx-auto px-6 py-6">
+        <div className="rounded-xl overflow-hidden" style={{ background: '#111827', border: '1px solid #1f2937' }}>
           <TabBar activeTab={activeTab} setActiveTab={setActiveTab} canRunSim={canRunSim} />
 
           <div className="p-6">
@@ -412,15 +432,25 @@ export default function App() {
 
             {activeTab === 'competitors' && (
               <div>
-                <div className="mb-5">
-                  <h2 className="text-lg font-semibold text-gray-900">Competitor Profiles</h2>
-                  <p className="text-sm text-gray-500 mt-0.5">
-                    Fill in data for each competitor. Scores update in real time.
-                  </p>
+                <div className="mb-5 flex items-start justify-between gap-4">
+                  <div>
+                    <h2 className="text-base font-semibold text-white">Competitor Profiles</h2>
+                    <p className="text-sm text-gray-400 mt-0.5">
+                      Fill in data for each competitor. Scores update in real time.
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => { setActiveTab('simulate') }}
+                    disabled={!canRunSim}
+                    className="shrink-0 px-4 py-2 text-sm font-medium rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                    style={{ background: canRunSim ? 'linear-gradient(135deg, #0ea5e9, #2563eb)' : undefined, color: canRunSim ? 'white' : undefined, border: !canRunSim ? '1px solid #374151' : undefined }}
+                  >
+                    Run Simulation →
+                  </button>
                 </div>
 
                 {/* Competitor sub-tabs */}
-                <div className="flex gap-1 mb-6 border-b border-gray-200">
+                <div className="flex gap-1 mb-6" style={{ borderBottom: '1px solid #1f2937' }}>
                   {competitors.map((c, i) => {
                     const label = c.name.trim() || `Competitor ${String.fromCharCode(65 + i)}`
                     const isActive = activeCompetitor === i
@@ -429,10 +459,10 @@ export default function App() {
                         key={i}
                         onClick={() => setActiveCompetitor(i)}
                         className={[
-                          'px-4 py-2 text-sm font-medium border-b-2 transition-colors whitespace-nowrap',
+                          'px-4 py-2.5 text-sm font-medium border-b-2 transition-colors whitespace-nowrap',
                           isActive
-                            ? 'border-blue-600 text-blue-600'
-                            : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300',
+                            ? 'border-sky-400 text-white'
+                            : 'border-transparent text-gray-500 hover:text-gray-300',
                         ].join(' ')}
                       >
                         {label}
@@ -465,6 +495,10 @@ export default function App() {
             )}
           </div>
         </div>
+
+        <p className="text-center text-xs text-gray-700 mt-6">
+          Powered by Anthropic Claude · Multi-agent competitive simulation
+        </p>
       </main>
     </div>
   )

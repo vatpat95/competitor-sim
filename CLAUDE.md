@@ -70,8 +70,10 @@ The backend loads `.env` from the project root (`../` relative to `/backend`). D
 | `backend/profileBuilder.js` | All scoring formulas. If you change a formula, re-run `test-profile.js` and update the assertions. |
 | `backend/prompts.js` | Three functions: system prompt per competitor, round 2/3 prompt, orchestrator prompt. Language rules are in the system prompt and orchestrator prompt comments. |
 | `backend/agents.js` | `runSimulation()` is the main export. The model is set as `MODEL` constant at the top — update there only. |
-| `frontend/src/App.jsx` | All app state lives here. `runSimulation()` fetch call is at line ~356. Demo data (`DEMO_COMPETITORS`, `DEMO_YOUR_COMPANY`) is defined at the top. |
-| `frontend/src/components/SimulationResults.jsx` | Results dashboard. `SensitivityPanel` manages its own local state and re-POSTs independently. `currentResult` is local state seeded from the `result` prop. |
+| `frontend/src/App.jsx` | All app state lives here. `runSimulation()` is inside the main `App` component. Demo data (`DEMO_COMPETITORS`, `DEMO_YOUR_COMPANY`) is defined at the top. The UI uses a dark navy enterprise theme — do not reintroduce light Tailwind classes (`bg-white`, `text-gray-900`, etc.) at the shell level. |
+| `frontend/src/components/SimulationResults.jsx` | Consultant-style results dashboard. Component order: `VerdictBanner` → `RecommendationPanel` → `CompetitiveResponseMatrix` → `ScenarioOutcomes` → `SensitivityPanel` → `Watchpoints` → `RoundDetail`. `SensitivityPanel` manages its own local state and re-POSTs independently. `currentResult` is local state seeded from the `result` prop and updated by sensitivity re-runs. |
+| `frontend/src/index.css` | Global baseline only — dark body background (`#0d1117`), heading/paragraph margin resets. No `h1`/`h2` color rules — those are handled per-component via Tailwind. Do not add project-level variables here. |
+| `frontend/src/components/CompetitorProfileForm.jsx` | Data entry form + live scorecard. `sharedInputCls` is the shared dark input class — use it for any new inputs. `SectionHeader` uses a left-border accent style. |
 
 ## Running tests
 
