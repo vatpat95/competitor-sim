@@ -20,11 +20,18 @@ function deriveVerdict(out) {
   const outcome = out?.playerOutcomes?.yourCompany?.outcome
   const hasBetter = Boolean(out?.betterAlternative?.move)
 
-  if (hasBetter || outcome === 'loses' || outcome === 'loses_significantly') {
+  if (outcome === 'loses' || outcome === 'loses_significantly') {
     return { verdict: 'REVISE STRATEGY', color: '#dc2626', bg: '#450a0a', border: '#7f1d1d', dot: 'bg-red-500', tag: 'red' }
   }
   if (outcome === 'wins' || outcome === 'gains') {
+    if (hasBetter) {
+      return { verdict: 'PROCEED WITH CAUTION', color: '#d97706', bg: '#1c1400', border: '#78350f', dot: 'bg-amber-400', tag: 'amber' }
+    }
     return { verdict: 'PROCEED', color: '#16a34a', bg: '#052e16', border: '#14532d', dot: 'bg-emerald-500', tag: 'green' }
+  }
+  // neutral outcome: revise if there's a clear alternative, otherwise caution
+  if (hasBetter) {
+    return { verdict: 'REVISE STRATEGY', color: '#dc2626', bg: '#450a0a', border: '#7f1d1d', dot: 'bg-red-500', tag: 'red' }
   }
   return { verdict: 'PROCEED WITH CAUTION', color: '#d97706', bg: '#1c1400', border: '#78350f', dot: 'bg-amber-400', tag: 'amber' }
 }

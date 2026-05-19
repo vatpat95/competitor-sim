@@ -2,6 +2,33 @@ import { useState, useEffect, useRef } from 'react'
 import CompetitorProfileForm from './components/CompetitorProfileForm'
 import SimulationResults from './components/SimulationResults'
 
+// ── Enums ─────────────────────────────────────────────────────────────────────
+
+const INDUSTRY_OPTIONS = [
+  { value: 'telecom',          label: 'Telecommunications' },
+  { value: 'banking_finance',  label: 'Banking & Financial Services' },
+  { value: 'saas_software',    label: 'SaaS / Software' },
+  { value: 'retail_ecommerce', label: 'Retail & E-commerce' },
+  { value: 'healthcare',       label: 'Healthcare & Life Sciences' },
+  { value: 'insurance',        label: 'Insurance' },
+  { value: 'media_streaming',  label: 'Media & Streaming' },
+  { value: 'logistics',        label: 'Logistics & Supply Chain' },
+  { value: 'energy_utilities', label: 'Energy & Utilities' },
+  { value: 'automotive',       label: 'Automotive' },
+  { value: 'hospitality',      label: 'Hospitality & Travel' },
+  { value: 'manufacturing',    label: 'Manufacturing' },
+  { value: 'other',            label: 'Other (describe below)' },
+]
+
+const COMPETITOR_TYPE_OPTIONS = [
+  { value: 'low_cost_challenger', label: 'Low-cost Challenger' },
+  { value: 'incumbent_leader',    label: 'Incumbent / Market Leader' },
+  { value: 'premium_brand',       label: 'Premium Brand' },
+  { value: 'regional_player',     label: 'Regional / Niche Player' },
+  { value: 'fast_follower',       label: 'Fast Follower' },
+  { value: 'disruptor',           label: 'Disruptor / New Entrant' },
+]
+
 // ── Defaults ──────────────────────────────────────────────────────────────────
 
 function defaultCompetitor() {
@@ -19,18 +46,18 @@ function defaultCompetitor() {
     ceoPriorityStatement: '',
     recentNewsSignals: [],
     regulatoryConstraints: '',
+    competitorType: '',
   }
 }
 
-// ── Demo dataset ──────────────────────────────────────────────────────────────
+// ── Demo scenarios ────────────────────────────────────────────────────────────
+// Three telecom scenarios — same market, same competitors (ValueNet,
+// PremiumConnect, RegionalPlus), different TelcoX strategic moves.
+// The simulation shows how the same competitive field reacts completely
+// differently depending on what TelcoX decides to do.
+// loadDemo() picks one at random each click.
 
-const DEMO_YOUR_COMPANY = {
-  name: 'TelcoX',
-  strategicMove: 'Launch of a new mid-market bundle priced 10% above ValueNet but with a 90-day free trial and dedicated onboarding',
-  context: 'We are targeting ValueNet\'s recent mid-market gains with a value-add play rather than a price war, betting that trial conversion and onboarding quality will differentiate us.',
-}
-
-const DEMO_COMPETITORS = [
+const TELECOM_COMPETITORS = [
   {
     name: 'ValueNet',
     revenueGrowthRate: 18.5,
@@ -46,11 +73,12 @@ const DEMO_COMPETITORS = [
     marketShareTrend: 'gaining',
     headcountTrend: 'growing',
     geographicFocus: 'North America, expanding EMEA',
+    competitorType: 'low_cost_challenger',
     ceoPriorityStatement: 'Our mission is to be the undisputed price-value leader in every market we enter. We will outgrow the competition by making our product impossible to ignore on price.',
     recentNewsSignals: [
       'Announced expansion into 4 new metro markets',
       'Hired 200 sales reps in Q1',
-      'Launched \'ValueNet Unlimited\' tier at 15% below nearest competitor',
+      "Launched 'ValueNet Unlimited' tier at 15% below nearest competitor",
       'Partnership with mid-market procurement platform',
     ],
     regulatoryConstraints: '',
@@ -70,10 +98,11 @@ const DEMO_COMPETITORS = [
     marketShareTrend: 'stable',
     headcountTrend: 'flat',
     geographicFocus: 'North America, Western Europe',
+    competitorType: 'premium_brand',
     ceoPriorityStatement: 'We compete on innovation and customer experience, not price. Our margins fund the R&D that keeps us two years ahead. We will not chase volume at the expense of profitability.',
     recentNewsSignals: [
-      'Launched AI-powered analytics suite exclusive to Enterprise tier',
-      'Won three analyst \'leader\' rankings in enterprise segment',
+      'Launched AI-powered network management suite exclusive to Enterprise tier',
+      "Won three analyst 'leader' rankings in enterprise connectivity segment",
       'Renewed multi-year contracts with 4 Fortune 500 accounts',
     ],
     regulatoryConstraints: 'Subject to enterprise data residency requirements in EU; limits rapid geographic expansion.',
@@ -93,13 +122,75 @@ const DEMO_COMPETITORS = [
     marketShareTrend: 'losing',
     headcountTrend: 'shrinking',
     geographicFocus: 'US Midwest and Southeast regional markets',
+    competitorType: 'regional_player',
     ceoPriorityStatement: 'We are focused on protecting our core rural and regional customer base. Our local relationships and dedicated support are what national players cannot replicate.',
     recentNewsSignals: [
       'Closed two regional offices to cut overhead',
       'Lost 3 mid-market accounts to ValueNet in Q1',
-      'Announced \'Regional Loyalty\' pricing program for long-term customers',
+      "Announced 'Regional Loyalty' pricing program for long-term customers",
     ],
     regulatoryConstraints: 'State-level telecom licensing in 6 states limits ability to exit or restructure quickly.',
+  },
+]
+
+const DEMO_SCENARIOS = [
+  // ── Scenario 1: Direct price cut — expected verdict: REVISE STRATEGY ──────────
+  // TelcoX tries to win back mid-market share by cutting price 10%.
+  // ValueNet (strong cash, 18.5% growth, deep price-cut history) will immediately
+  // out-discount and escalate. TelcoX bleeds margin with no durable share gain.
+  {
+    yourCompany: {
+      name: 'TelcoX',
+      strategicMove: '10% price cut on our core unlimited plan, effective immediately, to reclaim mid-market accounts',
+      context: 'Reacting to two consecutive quarters of mid-market share loss to ValueNet. The goal is to match their pricing and stop the bleed before Q3 renewal season.',
+      industry: 'telecom',
+      industryOther: '',
+      companyType: 'incumbent_leader',
+      marketGeography: 'North America',
+      marketOverview: 'Mature market with ~2% annual growth, high churn (18–22% annually), and mid-market consolidation driven by low-cost challengers. Enterprise segment is sticky; SMB and mid-market are the current battleground.',
+    },
+    competitors: TELECOM_COMPETITORS,
+  },
+
+  // ── Scenario 2: Premium bundle launch — expected verdict: PROCEED WITH CAUTION ─
+  // TelcoX launches a value bundle adding streaming, cloud backup and device
+  // insurance at a 15% premium. This is not a price fight — it's a value play.
+  // ValueNet can't easily match bundled content partnerships (no content licensing
+  // history). RegionalPlus can't afford content licensing costs. But PremiumConnect
+  // has the margin and brand equity to launch a counter-bundle quickly, so TelcoX
+  // wins — but needs to move fast before PremiumConnect closes the gap.
+  {
+    yourCompany: {
+      name: 'TelcoX',
+      strategicMove: "Launch 'TelcoX ONE' bundle: unlimited data + streaming (3 major platforms) + 200GB cloud backup + device insurance for 15% above our current base plan, targeting families and dual-income households",
+      context: 'Rather than compete on price, we are moving up the value stack. We have secured 18-month content partnerships that competitors do not have today. This is designed to reduce churn by increasing switching costs, not to acquire price-sensitive customers.',
+      industry: 'telecom',
+      industryOther: '',
+      companyType: 'incumbent_leader',
+      marketGeography: 'North America',
+      marketOverview: 'Mature market with ~2% annual growth, high churn (18–22% annually), and mid-market consolidation driven by low-cost challengers. Enterprise segment is sticky; SMB and mid-market are the current battleground.',
+    },
+    competitors: TELECOM_COMPETITORS,
+  },
+
+  // ── Scenario 3: Enterprise 5G private network — expected verdict: PROCEED ──────
+  // TelcoX launches a dedicated B2B 5G private network slicing product for
+  // large manufacturing and logistics enterprises — a segment none of the three
+  // competitors are positioned to serve. ValueNet has no enterprise sales motion.
+  // PremiumConnect is consumer-focused with no 5G infrastructure.
+  // RegionalPlus can't afford the CapEx. This is uncontested space.
+  {
+    yourCompany: {
+      name: 'TelcoX',
+      strategicMove: "Launch 'TelcoX Edge' — dedicated 5G private network slicing for enterprise manufacturing and logistics clients, starting at $80K annual contracts with guaranteed 99.99% uptime SLAs",
+      context: 'We are pivoting a portion of our 5G CapEx toward B2B enterprise clients who need private, low-latency connectivity for factory automation and real-time logistics tracking. No competitor has a credible 5G private network product today. This is a land-and-expand play — get 10 anchor clients, build reference cases, then expand.',
+      industry: 'telecom',
+      industryOther: '',
+      companyType: 'incumbent_leader',
+      marketGeography: 'North America',
+      marketOverview: 'Mature market with ~2% annual growth, high churn (18–22% annually), and mid-market consolidation driven by low-cost challengers. Enterprise segment is sticky; SMB and mid-market are the current battleground.',
+    },
+    competitors: TELECOM_COMPETITORS,
   },
 ]
 
@@ -162,6 +253,7 @@ function ScenarioSetupTab({ yourCompany, setYourCompany, onLoadDemo }) {
   }
 
   const inputCls = 'w-full px-3 py-2.5 bg-gray-900 border border-gray-700 rounded-lg text-sm text-gray-100 placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent transition-colors'
+  const selectCls = `${inputCls} cursor-pointer`
 
   return (
     <div className="space-y-6">
@@ -214,6 +306,80 @@ function ScenarioSetupTab({ yourCompany, setYourCompany, onLoadDemo }) {
             className={`${inputCls} resize-none`}
           />
         </Field>
+      </div>
+
+      {/* Market Context section */}
+      <div>
+        <div className="flex items-center gap-2 mb-1">
+          <div className="w-1 h-4 rounded-full" style={{ background: '#0ea5e9' }} />
+          <h3 className="text-xs font-bold uppercase tracking-wider" style={{ color: '#4a7fa5' }}>Market Context <span className="normal-case font-normal text-gray-600">(optional — helps agents reason more accurately)</span></h3>
+        </div>
+        <div className="space-y-4 mt-3">
+          <div className="grid grid-cols-2 gap-4">
+            <Field label="Industry">
+              <select
+                value={yourCompany.industry}
+                onChange={e => update('industry', e.target.value)}
+                className={selectCls}
+                style={{ background: '#111827' }}
+              >
+                <option value="">Select industry...</option>
+                {INDUSTRY_OPTIONS.map(o => (
+                  <option key={o.value} value={o.value}>{o.label}</option>
+                ))}
+              </select>
+            </Field>
+
+            <Field label="Your company's market role">
+              <select
+                value={yourCompany.companyType}
+                onChange={e => update('companyType', e.target.value)}
+                className={selectCls}
+                style={{ background: '#111827' }}
+              >
+                <option value="">Select role...</option>
+                {COMPETITOR_TYPE_OPTIONS.map(o => (
+                  <option key={o.value} value={o.value}>{o.label}</option>
+                ))}
+              </select>
+            </Field>
+          </div>
+
+          {yourCompany.industry === 'other' && (
+            <Field label="Describe your industry">
+              <input
+                type="text"
+                value={yourCompany.industryOther}
+                onChange={e => update('industryOther', e.target.value)}
+                placeholder="e.g. B2B fintech infrastructure"
+                className={inputCls}
+              />
+            </Field>
+          )}
+
+          <Field label="Market geography" hint="Where the competitive battle is playing out.">
+            <input
+              type="text"
+              value={yourCompany.marketGeography}
+              onChange={e => update('marketGeography', e.target.value)}
+              placeholder="e.g. North America, EMEA, Southeast Asia"
+              className={inputCls}
+            />
+          </Field>
+
+          <Field
+            label="Market overview"
+            hint="Brief description of market dynamics, growth rate, or key trends the agents should know about."
+          >
+            <textarea
+              value={yourCompany.marketOverview}
+              onChange={e => update('marketOverview', e.target.value)}
+              placeholder="e.g. Mature market with ~2% growth, high churn, mid-market consolidation driven by low-cost challengers"
+              rows={3}
+              className={`${inputCls} resize-none`}
+            />
+          </Field>
+        </div>
       </div>
 
       {yourCompany.name && yourCompany.strategicMove && (
@@ -352,7 +518,7 @@ function SimulateTab({ isLoading, error, simulationResult, onRun, onRerun, onBac
 export default function App() {
   const [activeTab, setActiveTab] = useState('setup')
   const [activeCompetitor, setActiveCompetitor] = useState(0)
-  const [yourCompany, setYourCompany] = useState({ name: '', strategicMove: '', context: '' })
+  const [yourCompany, setYourCompany] = useState({ name: '', strategicMove: '', context: '', industry: '', industryOther: '', companyType: '', marketGeography: '', marketOverview: '' })
   const [competitors, setCompetitors] = useState([
     defaultCompetitor(),
     defaultCompetitor(),
@@ -385,8 +551,9 @@ export default function App() {
   }
 
   function loadDemo() {
-    setYourCompany(DEMO_YOUR_COMPANY)
-    setCompetitors(DEMO_COMPETITORS)
+    const scenario = DEMO_SCENARIOS[Math.floor(Math.random() * DEMO_SCENARIOS.length)]
+    setYourCompany(scenario.yourCompany)
+    setCompetitors(scenario.competitors)
     setSimulationResult(null)
     setError(null)
     setActiveCompetitor(0)

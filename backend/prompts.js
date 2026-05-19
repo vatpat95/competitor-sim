@@ -3,6 +3,7 @@
  *
  * @typedef {{
  *   competitorName: string,
+ *   competitorType: string,
  *   finalPrimaryResponse: object,
  *   finalAlternativeResponse: object,
  *   confidenceScore: number,
@@ -10,13 +11,23 @@
  * }} FinalResponse
  */
 
+const COMPETITOR_TYPE_LABELS = {
+  low_cost_challenger: 'Low-cost Challenger',
+  incumbent_leader:    'Incumbent / Market Leader',
+  premium_brand:       'Premium Brand',
+  regional_player:     'Regional / Niche Player',
+  fast_follower:       'Fast Follower',
+  disruptor:           'Disruptor / New Entrant',
+};
+
 /**
  * Builds the system prompt for a competitor agent, embedding the full scored profile.
  *
  * @param {object} profile - Output of buildCompetitorProfile()
+ * @param {{ industryLabel?: string, companyType?: string, companyTypeLabel?: string, marketGeography?: string, marketOverview?: string }} scenarioContext
  * @returns {string}
  */
-export function buildCompetitorSystemPrompt(profile) {
+export function buildCompetitorSystemPrompt(profile, scenarioContext = {}) {
   const {
     name,
     ebitdaMargin,
@@ -29,7 +40,16 @@ export function buildCompetitorSystemPrompt(profile) {
     reactionPatternSummary,
     constraintSummary,
     signalSummary,
+    geographicFocus,
+    competitorType,
   } = profile;
+
+  const {
+    industryLabel = '',
+    companyTypeLabel = '',
+    marketGeography = '',
+    marketOverview = '',
+  } = scenarioContext;
 
   const capacityInterpretation =
     financialCapacityScore >= 70
@@ -61,10 +81,24 @@ export function buildCompetitorSystemPrompt(profile) {
     })
     .join('\n');
 
+  const myTypeLabel = COMPETITOR_TYPE_LABELS[competitorType] ?? '';
+  const contextLines = [
+    industryLabel    && `- Industry: ${industryLabel}`,
+    myTypeLabel      && `- Your Role in This Market: ${myTypeLabel}`,
+    geographicFocus  && `- Your Geographic Footprint: ${geographicFocus}`,
+    marketGeography  && `- Overall Market Geography: ${marketGeography}`,
+    companyTypeLabel && `- Triggering Company's Role: ${companyTypeLabel} (this shapes how seriously you take their move)`,
+    marketOverview   && `- Market Overview: ${marketOverview}`,
+  ].filter(Boolean);
+
+  const industryContextBlock = contextLines.length > 0
+    ? `INDUSTRY CONTEXT:\n${contextLines.join('\n')}\n\n`
+    : '';
+
   return `You are the Chief Strategy Officer of ${name}. You make competitive decisions based on your company's actual data and constraints.
 
 ---
-COMPANY FINANCIALS:
+${industryContextBlock}COMPANY FINANCIALS:
 - EBITDA Margin: ${ebitdaMargin}% | Revenue Growth: ${revenueGrowthRate}% YoY
 - Cash Position: ${cashPosition} | Debt-to-EBITDA: ${debtToEbitda}x
 
@@ -121,9 +155,10 @@ No markdown, no explanation outside the JSON.`;
  * @param {string} triggerEvent - Description of the competitive trigger
  * @param {object} profile - Output of buildCompetitorProfile() for this agent
  * @param {AgentRoundResponse[]} otherAgentsResponses - Round-1 responses from all other competitors
+ * @param {{ industryLabel?: string, marketGeography?: string }} scenarioContext
  * @returns {string}
  */
-export function buildCompetitorRoundPrompt(triggerEvent, profile, otherAgentsResponses) {
+export function buildCompetitorRoundPrompt(triggerEvent, profile, otherAgentsResponses, scenarioContext = {}) {
   const competitorMoves = otherAgentsResponses
     .map(({ competitorName, primaryResponse }) => {
       const { type, magnitude, timing } = primaryResponse;
@@ -131,9 +166,14 @@ export function buildCompetitorRoundPrompt(triggerEvent, profile, otherAgentsRes
     })
     .join('\n');
 
+  const { industryLabel = '', marketGeography = '' } = scenarioContext;
+  const { geographicFocus = '' } = profile;
+  const contextRecall = [industryLabel, marketGeography || geographicFocus].filter(Boolean).join(' | ');
+  const recallLine = contextRecall ? `Market context: ${contextRecall}\n\n` : '';
+
   return `TRIGGER EVENT: ${triggerEvent}
 
-MARKET UPDATE — your competitors have made the following moves:
+${recallLine}MARKET UPDATE — your competitors have made the following moves:
 ${competitorMoves}
 
 Given these market dynamics now unfolding, reconsider your position.
@@ -147,14 +187,34 @@ Respond in the same JSON format.`;
  *
  * @param {string} triggerEvent - Description of the competitive trigger
  * @param {FinalResponse[]} allFinalResponses - Final responses from all competitor agents
- * @param {{ name: string, strategicMove: string }} yourCompanyContext - The player's company and move
+ * @param {{ name: string, strategicMove: string, context?: string }} yourCompanyContext - The player's company and move
+ * @param {{ industryLabel?: string, companyTypeLabel?: string, marketGeography?: string, marketOverview?: string }} scenarioContext
  * @returns {string}
  */
-export function buildOrchestratorPrompt(triggerEvent, allFinalResponses, yourCompanyContext) {
+export function buildOrchestratorPrompt(triggerEvent, allFinalResponses, yourCompanyContext, scenarioContext = {}) {
+  const {
+    industryLabel = '',
+    companyTypeLabel = '',
+    marketGeography = '',
+    marketOverview = '',
+  } = scenarioContext;
+
+  const scenarioLines = [
+    industryLabel    && `- Industry: ${industryLabel}`,
+    companyTypeLabel && `- Your Company's Market Role: ${companyTypeLabel}`,
+    marketGeography  && `- Market Geography: ${marketGeography}`,
+    marketOverview   && `- Market Overview: ${marketOverview}`,
+  ].filter(Boolean);
+
+  const scenarioBlock = scenarioLines.length > 0
+    ? `\nSCENARIO CONTEXT:\n${scenarioLines.join('\n')}\n`
+    : '';
+
   const competitorSummaries = allFinalResponses
-    .map(({ competitorName, finalPrimaryResponse, finalAlternativeResponse, confidenceScore, dataPointsDriving }) => {
+    .map(({ competitorName, competitorType, finalPrimaryResponse, finalAlternativeResponse, confidenceScore, dataPointsDriving }) => {
+      const typeLabel = COMPETITOR_TYPE_LABELS[competitorType] ?? '';
       return [
-        `  ${competitorName}:`,
+        `  ${competitorName}:${typeLabel ? ` [${typeLabel}]` : ''}`,
         `    Primary: ${finalPrimaryResponse.type} | magnitude ${finalPrimaryResponse.magnitude} | ${finalPrimaryResponse.timing}`,
         `    Rationale: ${finalPrimaryResponse.rationale}`,
         `    Alternative: ${finalAlternativeResponse.type} | magnitude ${finalAlternativeResponse.magnitude} | ${finalAlternativeResponse.timing}`,
@@ -166,9 +226,9 @@ export function buildOrchestratorPrompt(triggerEvent, allFinalResponses, yourCom
 
   return `TRIGGER EVENT: ${triggerEvent}
 
-YOUR COMPANY: ${yourCompanyContext.name}
-YOUR STRATEGIC MOVE: ${yourCompanyContext.strategicMove}
-
+YOUR COMPANY: ${yourCompanyContext.name}${companyTypeLabel ? ` [${companyTypeLabel}]` : ''}
+YOUR STRATEGIC MOVE: ${yourCompanyContext.strategicMove}${yourCompanyContext.context ? `\nYOUR STRATEGIC CONTEXT: ${yourCompanyContext.context}` : ''}
+${scenarioBlock}
 COMPETITOR FINAL RESPONSES:
 ${competitorSummaries}
 
@@ -184,6 +244,7 @@ STRICT LANGUAGE RULES:
   - Bad: "RegionalPlus faces significant financial constraints limiting their response options"
 - Numbers + plain English together = credibility. Never one without the other.
 - Be direct and opinionated — say "do X by [date]" not "consider whether X might be appropriate"
+- For betterAlternative: set to null if the current move is already the right call given the competitive dynamics — do NOT manufacture an alternative just to have one. Only populate it when a genuinely different move would produce a materially better outcome.
 - For player outcomes: 1-2 plain sentences about what actually happens and why, with a number or fact to anchor it
 - For scenarios: describe what a customer, salesperson, or CFO would actually see and experience
 - For watchlist signals: "Watch for [specific observable thing] — if it happens, it means [plain implication with a number if possible] and you should [concrete action]"
@@ -197,7 +258,7 @@ Synthesize these competitive dynamics and respond ONLY with valid JSON in this e
     "[competitorName for each competitor]": { "outcome": "wins"|"neutral"|"loses", "reasoning": string }
   },
   "strategicRecommendation": string (3-5 clear sentences. Start with the single most important thing to do NOW. Then the second priority. Be specific about timing and why. Write like you are the most trusted advisor in the room.),
-  "betterAlternative": {
+  "betterAlternative": null | {
     "move": string (a clear, specific move in plain English — not a category name),
     "reasoning": string (why this beats the current plan — use plain cause-and-effect),
     "expectedOutcome": string (what concretely happens if they do this)

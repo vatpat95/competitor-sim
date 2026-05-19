@@ -14,7 +14,8 @@
  *   geographicFocus: string,
  *   ceoPriorityStatement: string,
  *   recentNewsSignals: string[],
- *   regulatoryConstraints: string
+ *   regulatoryConstraints: string,
+ *   competitorType: "low_cost_challenger"|"incumbent_leader"|"premium_brand"|"regional_player"|"fast_follower"|"disruptor"|""
  * }} RawInputs
  */
 
@@ -43,9 +44,11 @@ export function buildCompetitorProfile(rawInputs) {
     lastThreePriceMoves,
     marketShareTrend,
     headcountTrend,
+    geographicFocus,
     ceoPriorityStatement,
     recentNewsSignals,
     regulatoryConstraints,
+    competitorType,
   } = rawInputs;
 
   // ── 1. financialCapacityScore ────────────────────────────────────────────
@@ -176,6 +179,9 @@ export function buildCompetitorProfile(rawInputs) {
     revenueGrowthRate,
     cashPosition,
     debtToEbitda,
+    // Qualitative context passed through for prompt rendering
+    geographicFocus: geographicFocus || '',
+    competitorType: competitorType || '',
     // Computed scores
     financialCapacityScore,
     aggressionIndex,

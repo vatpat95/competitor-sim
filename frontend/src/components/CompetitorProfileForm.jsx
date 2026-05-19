@@ -1,3 +1,12 @@
+const COMPETITOR_TYPE_OPTIONS = [
+  { value: 'low_cost_challenger', label: 'Low-cost Challenger' },
+  { value: 'incumbent_leader',    label: 'Incumbent / Market Leader' },
+  { value: 'premium_brand',       label: 'Premium Brand' },
+  { value: 'regional_player',     label: 'Regional / Niche Player' },
+  { value: 'fast_follower',       label: 'Fast Follower' },
+  { value: 'disruptor',           label: 'Disruptor / New Entrant' },
+]
+
 // ── Score computation (mirrors backend profileBuilder.js) ────────────────────
 
 function computeScores(c) {
@@ -290,16 +299,31 @@ export default function CompetitorProfileForm({ competitor, onChange, index }) {
     <div className="flex gap-6">
       {/* ── Form ── */}
       <div className="flex-1 min-w-0">
-        {/* Competitor name */}
-        <FieldRow label="Competitor name">
-          <input
-            type="text"
-            value={competitor.name || ''}
-            onChange={e => update('name', e.target.value)}
-            placeholder="e.g. ValueNet"
-            className={sharedInputCls}
-          />
-        </FieldRow>
+        {/* Competitor name + type */}
+        <div className="grid grid-cols-2 gap-3 mb-3">
+          <FieldRow label="Competitor name">
+            <input
+              type="text"
+              value={competitor.name || ''}
+              onChange={e => update('name', e.target.value)}
+              placeholder="e.g. ValueNet"
+              className={sharedInputCls}
+            />
+          </FieldRow>
+          <FieldRow label="Competitor type (optional)">
+            <select
+              value={competitor.competitorType || ''}
+              onChange={e => update('competitorType', e.target.value)}
+              className={sharedInputCls + ' cursor-pointer'}
+              style={{ background: '#111827', border: '1px solid #374151' }}
+            >
+              <option value="">Select type...</option>
+              {COMPETITOR_TYPE_OPTIONS.map(o => (
+                <option key={o.value} value={o.value}>{o.label}</option>
+              ))}
+            </select>
+          </FieldRow>
+        </div>
 
         {/* Section 1 — Financial health */}
         <SectionHeader title="Financial Health" />

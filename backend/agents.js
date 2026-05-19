@@ -16,6 +16,33 @@ const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 const MODEL = 'claude-sonnet-4-6';
 
+// ── Industry lookup (mirrors frontend INDUSTRY_OPTIONS) ───────────────────────
+
+const INDUSTRY_OPTIONS = [
+  { value: 'telecom',          label: 'Telecommunications' },
+  { value: 'banking_finance',  label: 'Banking & Financial Services' },
+  { value: 'saas_software',    label: 'SaaS / Software' },
+  { value: 'retail_ecommerce', label: 'Retail & E-commerce' },
+  { value: 'healthcare',       label: 'Healthcare & Life Sciences' },
+  { value: 'insurance',        label: 'Insurance' },
+  { value: 'media_streaming',  label: 'Media & Streaming' },
+  { value: 'logistics',        label: 'Logistics & Supply Chain' },
+  { value: 'energy_utilities', label: 'Energy & Utilities' },
+  { value: 'automotive',       label: 'Automotive' },
+  { value: 'hospitality',      label: 'Hospitality & Travel' },
+  { value: 'manufacturing',    label: 'Manufacturing' },
+  { value: 'other',            label: 'Other' },
+];
+
+const COMPETITOR_TYPE_LABELS = {
+  low_cost_challenger: 'Low-cost Challenger',
+  incumbent_leader:    'Incumbent / Market Leader',
+  premium_brand:       'Premium Brand',
+  regional_player:     'Regional / Niche Player',
+  fast_follower:       'Fast Follower',
+  disruptor:           'Disruptor / New Entrant',
+};
+
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 function stripFences(text) {
@@ -54,11 +81,11 @@ function hasShifted(r1, r2) {
 
 // ── Single competitor API call ────────────────────────────────────────────────
 
-async function callCompetitorAgent(profile, messages) {
+async function callCompetitorAgent(profile, messages, scenarioContext = {}) {
   const res = await anthropic.messages.create({
     model: MODEL,
     max_tokens: 1000,
-    system: buildCompetitorSystemPrompt(profile),
+    system: buildCompetitorSystemPrompt(profile, scenarioContext),
     messages,
   });
   const text = res.content[0].text;
@@ -67,9 +94,9 @@ async function callCompetitorAgent(profile, messages) {
 
 // ── Round runners ─────────────────────────────────────────────────────────────
 
-async function runRound1(competitors, triggerMessage) {
+async function runRound1(competitors, triggerMessage, scenarioContext) {
   const calls = competitors.map(profile =>
-    callCompetitorAgent(profile, [{ role: 'user', content: triggerMessage }]).then(response => ({
+    callCompetitorAgent(profile, [{ role: 'user', content: triggerMessage }], scenarioContext).then(response => ({
       competitorName: profile.name,
       profile,
       response,
@@ -79,11 +106,11 @@ async function runRound1(competitors, triggerMessage) {
   return Promise.all(calls);
 }
 
-async function runRoundN(competitors, triggerMessage, triggerEvent, previousResults, roundNumber) {
+async function runRoundN(competitors, triggerMessage, triggerEvent, previousResults, roundNumber, scenarioContext) {
   const calls = competitors.map((profile, i) => {
     const round1Response = previousResults[i].response;
     const others = otherResponses(previousResults, profile.name);
-    const roundPrompt = buildCompetitorRoundPrompt(triggerEvent, profile, others);
+    const roundPrompt = buildCompetitorRoundPrompt(triggerEvent, profile, others, scenarioContext);
 
     const messages = [
       { role: 'user', content: triggerMessage },
@@ -91,7 +118,7 @@ async function runRoundN(competitors, triggerMessage, triggerEvent, previousResu
       { role: 'user', content: roundPrompt },
     ];
 
-    return callCompetitorAgent(profile, messages).then(response => ({
+    return callCompetitorAgent(profile, messages, scenarioContext).then(response => ({
       competitorName: profile.name,
       profile,
       response,
@@ -107,7 +134,7 @@ async function runRoundN(competitors, triggerMessage, triggerEvent, previousResu
  * Runs a full multi-round competitive simulation.
  *
  * @param {{
- *   yourCompany: { name: string, strategicMove: string, context: string },
+ *   yourCompany: { name: string, strategicMove: string, context: string, industry?: string, industryOther?: string, companyType?: string, marketGeography?: string, marketOverview?: string },
  *   competitors: object[]
  * }} scenario
  */
@@ -116,13 +143,24 @@ export async function runSimulation(scenario) {
   const triggerMessage = buildTriggerMessage(yourCompany);
   const triggerEvent = `${yourCompany.name} has announced: ${yourCompany.strategicMove}`;
 
+  // ── Derive scenario context ──────────────────────────────────────────────────
+  const industryOption = INDUSTRY_OPTIONS.find(o => o.value === yourCompany.industry);
+  const scenarioContext = {
+    industryLabel: industryOption?.label ?? yourCompany.industryOther ?? '',
+    industryOther: yourCompany.industryOther ?? '',
+    companyType: yourCompany.companyType ?? '',
+    companyTypeLabel: COMPETITOR_TYPE_LABELS[yourCompany.companyType] ?? '',
+    marketGeography: yourCompany.marketGeography ?? '',
+    marketOverview: yourCompany.marketOverview ?? '',
+  };
+
   // ── Round 1 ─────────────────────────────────────────────────────────────────
   console.log('[simulation] Round 1 — independent reactions...');
-  const round1Results = await runRound1(competitors, triggerMessage);
+  const round1Results = await runRound1(competitors, triggerMessage, scenarioContext);
 
   // ── Round 2 ─────────────────────────────────────────────────────────────────
   console.log('[simulation] Round 2 — reactive adjustments...');
-  const round2Results = await runRoundN(competitors, triggerMessage, triggerEvent, round1Results, 2);
+  const round2Results = await runRoundN(competitors, triggerMessage, triggerEvent, round1Results, 2, scenarioContext);
 
   // ── Equilibrium check ───────────────────────────────────────────────────────
   const shifted = round2Results.some((r2, i) => hasShifted(round1Results[i].response, r2.response));
@@ -136,13 +174,14 @@ export async function runSimulation(scenario) {
     console.log('[simulation] Skipping round 3 — equilibrium already reached.');
   } else {
     console.log('[simulation] Round 3 — final adjustment...');
-    round3Results = await runRoundN(competitors, triggerMessage, triggerEvent, round2Results, 3);
+    round3Results = await runRoundN(competitors, triggerMessage, triggerEvent, round2Results, 3, scenarioContext);
   }
 
   // ── Orchestrator ────────────────────────────────────────────────────────────
   console.log('[simulation] Running orchestrator synthesis...');
   const allFinalResponses = round3Results.map(r => ({
     competitorName: r.competitorName,
+    competitorType: r.profile.competitorType ?? '',
     finalPrimaryResponse: r.response.primaryResponse ?? {},
     finalAlternativeResponse: r.response.alternativeResponse ?? {},
     confidenceScore: r.response.confidenceScore ?? 0,
@@ -158,7 +197,7 @@ export async function runSimulation(scenario) {
     messages: [
       {
         role: 'user',
-        content: buildOrchestratorPrompt(triggerEvent, allFinalResponses, yourCompany),
+        content: buildOrchestratorPrompt(triggerEvent, allFinalResponses, yourCompany, scenarioContext),
       },
     ],
   });
