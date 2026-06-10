@@ -28,7 +28,9 @@ app.post('/api/simulate', async (req, res) => {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
-    const enrichedProfiles = competitors.map(buildCompetitorProfile);
+    const enrichedProfiles = competitors
+      .filter(c => c.name?.trim())
+      .map(buildCompetitorProfile);
 
     const result = await runSimulation({ yourCompany, competitors: enrichedProfiles });
 

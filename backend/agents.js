@@ -10,9 +10,9 @@ import {
 
 // Load .env from project root (one level above /backend)
 const __dirname = dirname(fileURLToPath(import.meta.url));
-config({ path: resolve(__dirname, '../.env') });
+const { parsed: env } = config({ path: resolve(__dirname, '../.env'), override: true });
 
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+const anthropic = new Anthropic({ apiKey: env?.ANTHROPIC_API_KEY ?? process.env.ANTHROPIC_API_KEY });
 
 const MODEL = 'claude-sonnet-4-6';
 

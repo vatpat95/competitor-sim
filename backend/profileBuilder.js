@@ -182,6 +182,7 @@ export function buildCompetitorProfile(rawInputs) {
     // Qualitative context passed through for prompt rendering
     geographicFocus: geographicFocus || '',
     competitorType: competitorType || '',
+    ceoPriorityStatement: ceoPriorityStatement || '',
     // Computed scores
     financialCapacityScore,
     aggressionIndex,

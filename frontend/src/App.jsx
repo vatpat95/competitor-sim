@@ -194,6 +194,182 @@ const DEMO_SCENARIOS = [
   },
 ]
 
+// ── Real historical scenario — T-Mobile Uncarrier (March 2013) ────────────────
+// All financial data sourced from SEC filings, official earnings releases, and
+// contemporaneous press coverage. Figures marked [calc] are derived from confirmed
+// primary numbers. Use this for the demo backtest: same scoring model, real
+// inputs, known outcome (T-Mobile gained 22M subscribers post-Uncarrier).
+
+const TMOBILE_UNCARRIER_SCENARIO = {
+  yourCompany: {
+    name: 'T-Mobile',
+    strategicMove: "Launch the 'Uncarrier' initiative: eliminate all 2-year service contracts, introduce no-contract Simple Choice plans starting at $50/month per line for unlimited talk, text, and 500MB high-speed data; separate smartphone financing via Equipment Installment Plans instead of subsidized handset contracts",
+    context: "T-Mobile is the 4th-largest US carrier and has been losing postpaid subscribers to AT&T and Verizon for consecutive years. A blocked AT&T acquisition in 2011 left the company independent with a $3B breakup fee. New CEO John Legere (September 2012) has an explicit disruptive mandate. T-Mobile's 4G LTE is launching in only 7 cities as of March 2013 — the bet is price transparency and contract freedom to poach customers frustrated with incumbent contract terms before Q3 renewal season.",
+    industry: 'telecom',
+    industryOther: '',
+    companyType: 'disruptor',
+    marketGeography: 'United States',
+    marketOverview: 'US wireless market with ~300M subscribers (2013). AT&T and Verizon hold ~65% combined market share. Market transitioning to smartphones and LTE data plans. Monthly postpaid churn ranges 1.5–2.8% across carriers. AT&T and Verizon both restructured pricing upward in 2011–2012. Sprint is financially distressed from the Nextel integration and Network Vision rebuild. Growing consumer frustration with 2-year contracts, device upgrade restrictions, and opaque fees.',
+  },
+  competitors: [
+    {
+      // Source: AT&T Q4 2012 SEC 8-K; CNN Money Jan 18 2012; AT&T full-year 2012 results
+      name: 'AT&T',
+      revenueGrowthRate: 1,           // Full-year 2012: $127.4B vs $126.7B in 2011 (SEC 8-K FY2013)
+      ebitdaMargin: 32,               // [calc] Wireless service EBITDA margin ~40–41%; consolidated lower due to wireline drag
+      cashPosition: 'strong',         // Best-ever cash from operations in 2012; returned $23B to shareholders
+      debtToEbitda: 1.6,              // [calc] LTD $61.3B + $3.5B current = $64.8B total debt / ~$40B EBITDA
+      rdSpendPct: 1,                  // Telco R&D minimal; innovation investment is capex (Project VIP: $22B+)
+      lastThreePriceMoves: [
+        { direction: 'up', magnitude: 25, context: 'Jan 2012: Hiked tiered data plans — lowest tier from $15→$20/month (+33%), mid-tier from $25→$30/month (+20%). Source: CNN Money Jan 18, 2012.' },
+        { direction: 'up', magnitude: 10, context: 'Jul 2012: Launched Mobile Share pooled data plans — effective cost increase vs prior unlimited plans for most individual users.' },
+        { direction: 'up', magnitude: 10, context: 'Jan 2011: Ended renewal discount perks; raised activation fee for additional family plan lines from $26 to $36 per line. Source: CNN Money Jan 20, 2011.' },
+      ],
+      marketShareTrend: 'stable',
+      headcountTrend: 'shrinking',
+      geographicFocus: 'United States (nationwide)',
+      competitorType: 'incumbent_leader',
+      ceoPriorityStatement: "Our wireless network performance continues to be terrific. 2013 is the year of the network. With Project VIP, we are delivering faster speeds to millions more customers and our 4G LTE network is on pace to cover 200 million Americans by year-end. We compete on network quality and reliability — not price.",
+      recentNewsSignals: [
+        'Jan 2012: Raised smartphone data plan prices 20–33% across tiered plans (CNN Money, confirmed)',
+        'Jul 2012: Launched Mobile Share pooled data plans — pricing restructured upward for most users',
+        'Project VIP: $22B+ network investment plan 2012–2015 targeting 300M LTE coverage',
+        'Full-year 2012: Best-ever cash from operations; returned $23B to shareholders via dividends and buybacks',
+      ],
+      regulatoryConstraints: 'FCC/DOJ blocked AT&T acquisition of T-Mobile in 2011 (antitrust); future large-scale spectrum acquisitions subject to regulatory review',
+    },
+    {
+      // Source: Verizon 2012 SEC 8-K filings; Verizon annual results confirmed in search
+      name: 'Verizon',
+      revenueGrowthRate: 4.5,         // Full-year 2012: $115.8B vs $110.8B in 2011, confirmed from SEC filings
+      ebitdaMargin: 33,               // [calc] Quarterly EBITDA Q1 $9.2B + Q2 $9.8B + Q3 $9.65B → ~$38.5B FY / $115.8B revenue
+      cashPosition: 'strong',         // Cash from operations $31.5B in 2012; free cash flow $13.4B in first 9 months
+      debtToEbitda: 1.35,             // [calc] Year-end 2012 total debt $52.0B (confirmed) / ~$38.5B EBITDA
+      rdSpendPct: 1,                  // Telco R&D minimal; innovation is network capex-driven
+      lastThreePriceMoves: [
+        { direction: 'up', magnitude: 10, context: 'Jan 2011: Ended "New Every Two" upgrade discount program — effective price increase for contract renewal customers. Source: CNN Money Jan 20, 2011.' },
+        { direction: 'up', magnitude: 15, context: 'Jun 2012: Launched Share Everything pooled data plans — higher effective cost for individual users vs prior unlimited plans. Source: Fierce Network / Neowin.' },
+        { direction: 'hold', magnitude: 0, context: '2012–early 2013: Held premium pricing position; no further rate changes ahead of T-Mobile Uncarrier launch.' },
+      ],
+      marketShareTrend: 'stable',
+      headcountTrend: 'shrinking',
+      geographicFocus: 'United States (nationwide)',
+      competitorType: 'incumbent_leader',
+      ceoPriorityStatement: "Verizon's consistent strategic investments in wireless, FiOS and global networks drove strong financial performance. We are focused on continuing to provide the best portfolio of products on the most reliable networks. — Lowell McAdam, Verizon CEO (confirmed quote)",
+      recentNewsSignals: [
+        'Jun 2012: Launched Share Everything pooled data plans — industry-first major shared data offering',
+        'Full-year 2012: Revenue $115.8B (+4.5% YoY); wireless EBITDA service margin 46–50% (SEC filings)',
+        'LTE network reached 500+ markets covering ~280M Americans by early 2013',
+        'Surpassed 100M total wireless connections in 2012; year-end total debt reduced to $52.0B',
+      ],
+      regulatoryConstraints: 'FCC spectrum holding reviews; large-scale acquisitions require regulatory approval',
+    },
+    {
+      // Source: Sprint Q4 2012 earnings release (SEC); Sprint Q1 2012 Business Wire; Sprint 10-K 2012
+      name: 'Sprint',
+      revenueGrowthRate: 5,           // Full-year 2012 consolidated net operating revenue $35.3B, up 5% YoY (SEC confirmed)
+      ebitdaMargin: 13.6,             // [calc] Full-year 2012 Adjusted OIBDA $4.8B / $35.3B revenue (SEC confirmed)
+      cashPosition: 'weak',           // Highly leveraged; SoftBank injection helped but underlying ops constrained
+      debtToEbitda: 4.6,              // [calc] Long-term debt + leases ~$22.3B (SEC confirmed) / $4.8B OIBDA
+      rdSpendPct: 1.5,                // [estimated] Minimal formal R&D; capex dominated by Network Vision rebuild ($6B+/yr)
+      lastThreePriceMoves: [
+        { direction: 'hold', magnitude: 0, context: '2012: Maintained unlimited data as sole differentiator while AT&T and Verizon launched tiered/shared plans — held pricing as competitive statement.' },
+        { direction: 'hold', magnitude: 0, context: '2012: Held core plan pricing despite rising network rebuild costs — financially constrained by $22B+ long-term debt load.' },
+        { direction: 'hold', magnitude: 0, context: 'Early 2013: No pricing action possible — $6B+ annual capex commitment for Network Vision LTE buildout consumed available capital.' },
+      ],
+      marketShareTrend: 'losing',
+      headcountTrend: 'shrinking',
+      geographicFocus: 'United States (nationwide)',
+      competitorType: 'low_cost_challenger',
+      ceoPriorityStatement: "2013 is a year of rebuilding. Like the third pig who built with brick, we are taking longer but building a stronger foundation. The Network Vision investment will deliver greater speeds and capacity. Our unlimited offer remains our unique competitive advantage — no other major carrier offers true unlimited data. — Dan Hesse, Sprint CEO (Marketplace interview, Dec 30 2013)",
+      recentNewsSignals: [
+        'Oct 2012: SoftBank of Japan announced acquisition of 70% Sprint stake for $20.1B (confirmed)',
+        'Network Vision LTE rebuild underway — Nextel CDMA spectrum repurposed; Nextel shutdown scheduled mid-2013, ~4.4M subscribers migrating (Sprint 10-K)',
+        'Full-year 2012: Revenue $35.3B (+5%), Adjusted OIBDA $4.8B — only major carrier losing postpaid subscribers (Sprint SEC filings)',
+        'Sole major carrier offering unlimited data as AT&T and Verizon moved to tiered/shared plans',
+      ],
+      regulatoryConstraints: 'SoftBank acquisition required FCC/DOJ approval (cleared early 2013); Clearwire acquisition pending; Nextel spectrum repurposing under FCC oversight',
+    },
+  ],
+}
+
+// ── Real historical scenario — Coca-Cola pricing discipline vs PepsiCo (Feb 2023) ───
+// INPUT DATA:    FY2022 financials (year ending Dec 31, 2022) — most recent full year at trigger date
+// TRIGGER DATE:  February 9, 2023 — Coca-Cola Q4 2022 earnings call, Quincey announces 2023 pricing strategy
+// PREDICTIONS:   Full-year 2023 — what unfolds over the next 12 months
+// VERIFICATION:  2023 actual results — PepsiCo had 9 consecutive quarters of volume decline;
+//                Coke maintained market share dominance. PepsiCo CEO acknowledged elasticity
+//                "worse than expected" on Q3 2023 earnings call.
+// EXPECTED VERDICT: PROCEED — Coca-Cola's pricing discipline holds; PepsiCo forced to moderate.
+
+const COCACOLA_PEPSI_SCENARIO = {
+  yourCompany: {
+    name: 'Coca-Cola',
+    strategicMove: "Announce mid-single-digit price increases across the US portfolio for 2023, backed by increased marketing investment — competing on brand strength and consumer value rather than promotional discounting or trade-spend",
+    context: "Coca-Cola enters 2023 as the dominant US CSD player with 46.3% market share after 11% revenue growth in 2022. CEO James Quincey on Q4 2022 earnings (Feb 9, 2023): 'there will be pricing in 2023 to reflect the continuing inflation in import and SG&A costs' and 'we need to own that pricing by delivering value consumers appreciate through marketing and innovation.' Strategy: hold pricing, invest in brand, let competitors blink first as consumer wallet pressure mounts.",
+    industry: 'other',
+    industryOther: 'Consumer Packaged Goods (CPG) / Beverages',
+    companyType: 'incumbent_leader',
+    marketGeography: 'United States',
+    marketOverview: "US beverage market ~$100B+ annual retail sales. CSD category declining ~1-2% annually by volume as consumers shift to water and energy drinks. Coca-Cola holds 46.3% US CSD share vs PepsiCo 24.7% (Statista 2022). All major players took 10-14% price increases in 2021-2022 to offset commodity inflation (US CPI peaked 9.1% June 2022). Consumer wallets under pressure — low-income households beginning to trade down to private label. Private label beverage shelf space expanding at major retailers.",
+  },
+  competitors: [
+    {
+      // Source: PepsiCo 10-K FY2022 (SEC); PepsiCo Q4 2022 earnings CNBC Feb 9 2023; Statista US CSD share
+      name: 'PepsiCo',
+      revenueGrowthRate: 9,           // FY2022: $86.4B vs $79.5B (2021). Source: PepsiCo 10-K FY2022 (SEC)
+      ebitdaMargin: 16,               // [calculated] Op. income $11.5B + D&A $2.7B = $14.2B / $86.4B revenue
+      cashPosition: 'moderate',       // Cash $4.95B, short-term investments $394M. Source: PepsiCo 10-K FY2022
+      debtToEbitda: 2.8,              // [calculated] Total debt $39.1B / $14.2B EBITDA. Source: PepsiCo 10-K FY2022
+      rdSpendPct: 1,                  // ~$600-700M R&D on $86B revenue; CPG beverages industry norm
+      lastThreePriceMoves: [
+        { direction: 'up', magnitude: 12, context: 'Q2 2022: +12% price/mix increase across North America Beverages and Frito-Lay to offset commodity and supply chain inflation. Source: PepsiCo Q2 2022 8-K (SEC).' },
+        { direction: 'up', magnitude: 10, context: 'Q1 2022: +10% price/mix increase, first major pricing action of the inflation cycle. Source: PepsiCo Q1 2022 8-K (SEC).' },
+        { direction: 'up', magnitude: 7,  context: 'Q4 2022: +7% price/mix, moderating from H1 peak; PBNA volume -2% — early elasticity pressure. Source: PepsiCo Q4 2022 earnings, CNBC Feb 9 2023.' },
+      ],
+      marketShareTrend: 'losing',     // US CSD: 26% (2021) → 24.7% (2022). Source: Statista
+      headcountTrend: 'growing',      // 291,000 (2021) → 309,000 (2022). Source: PepsiCo DEF 14A FY2022 (SEC)
+      geographicFocus: 'United States (primary scenario focus); global operations in 200+ countries',
+      competitorType: 'incumbent_leader',
+      ceoPriorityStatement: "The truth is that the investment we've made in the brands in the last few years are paying off in the sense that our brands are being stretched to higher price points and consumers are following us. For 2023, we expect to deliver 6% organic revenue growth. — Ramon Laguarta, Q4 2022 earnings call and press release, February 9, 2023 (verbatim quotes)",
+      recentNewsSignals: [
+        'Q4 2022: North America Beverage volume -2% despite 7% pricing — first clear sign of consumer price resistance. Source: PepsiCo Q4 2022 earnings.',
+        'FY2022: Organic revenue growth 14.4% driven almost entirely by price/mix, not volume. Source: PepsiCo FY2022 10-K (SEC).',
+        'Management guidance Feb 2023: signalled backing off future price increases as inflation decelerates. Source: Q4 2022 earnings call (Yahoo Finance transcript).',
+        'US CSD market share declined from 26% (2021) to 24.7% (2022). Source: Statista.',
+      ],
+      regulatoryConstraints: 'Standard US food and beverage regulations; sugar tax exposure in select municipalities; FTC oversight on acquisitions',
+    },
+    {
+      // Source: KDP PR Newswire Feb 23 2023; KDP FY2022 earnings release; MacroTrends KDP employees
+      name: 'Keurig Dr Pepper',
+      revenueGrowthRate: 10.8,        // FY2022: $14.057B vs $12.683B (2021). Source: KDP PR Newswire Feb 23 2023
+      ebitdaMargin: 23.6,             // Confirmed: EBITDA $3.314B / net sales $14.057B. Source: KDP FY2022 earnings
+      cashPosition: 'moderate',       // Debt-to-EBITDA 2.8x as reported by management. Source: KDP FY2022 earnings
+      debtToEbitda: 2.8,              // Management-disclosed figure. Source: KDP FY2022 earnings release
+      rdSpendPct: 1,
+      lastThreePriceMoves: [
+        { direction: 'up', magnitude: 10, context: 'FY2022: Net sales grew 11% driven by pricing across Dr Pepper, 7UP, Snapple, and Keurig coffee. Source: KDP FY2022 annual results (PR Newswire Feb 23 2023).' },
+        { direction: 'up', magnitude: 8,  context: '2021: Multiple pricing rounds across beverage and coffee portfolios to offset commodity inflation. Source: KDP investor materials.' },
+        { direction: 'up', magnitude: 5,  context: 'Early 2023 guidance: Mid-single-digit revenue growth expected as pricing moderates from 2022 levels. Source: KDP Q4 2022 earnings Feb 23 2023.' },
+      ],
+      marketShareTrend: 'stable',
+      headcountTrend: 'growing',      // ~27,000 (2021) → ~28,000 (2022). Source: MacroTrends KDP employee data
+      geographicFocus: 'United States (primarily domestic; limited international footprint vs Coke/Pepsi)',
+      competitorType: 'fast_follower',
+      ceoPriorityStatement: "We accelerated our revenue growth for the fifth consecutive year, delivering 12% growth in Q4 and 11% for the full year. In 2023, we expect mid-single-digit revenue growth as the rate of pricing moderates and gross margins improve as the relationship between inflation and pricing normalises. — Bob Gamgort, KDP CEO (confirmed quote, Feb 23 2023 earnings release)",
+      recentNewsSignals: [
+        'FY2022: Net sales $14.1B (+10.8% YoY), fifth consecutive year of revenue growth acceleration. Source: KDP FY2022 earnings.',
+        'EBITDA declined 8% in 2022 despite revenue growth — cost inflation outpaced pricing on margin line. Source: KDP 2022 results.',
+        '2023 guidance: mid-single-digit revenue growth with explicit pricing moderation vs 2022 levels. Source: KDP Q4 2022 earnings Feb 2023.',
+        'Strategic investments in energy drinks and cold brew platforms diversifying beyond traditional CSD and coffee.',
+      ],
+      regulatoryConstraints: 'Standard US food and beverage regulations; sugar tax exposure in select markets; antitrust scrutiny on coffee category consolidation',
+    },
+    { name: '', revenueGrowthRate: 0, ebitdaMargin: 0, cashPosition: 'moderate', debtToEbitda: 0, rdSpendPct: 0, lastThreePriceMoves: [], marketShareTrend: 'stable', headcountTrend: 'flat', geographicFocus: '', ceoPriorityStatement: '', recentNewsSignals: [], regulatoryConstraints: '', competitorType: '' },
+  ],
+}
+
 // ── Sub-components ────────────────────────────────────────────────────────────
 
 function TabBar({ activeTab, setActiveTab, canRunSim }) {
@@ -247,7 +423,7 @@ function Field({ label, children, hint }) {
   )
 }
 
-function ScenarioSetupTab({ yourCompany, setYourCompany, onLoadDemo }) {
+function ScenarioSetupTab({ yourCompany, setYourCompany, onLoadDemo, onLoadRealScenario, onLoadCPGScenario }) {
   function update(key, value) {
     setYourCompany(prev => ({ ...prev, [key]: value }))
   }
@@ -262,12 +438,28 @@ function ScenarioSetupTab({ yourCompany, setYourCompany, onLoadDemo }) {
           <h2 className="text-base font-semibold text-white">Your Company &amp; Strategic Move</h2>
           <p className="text-sm text-gray-400 mt-0.5">Define the competitive trigger you want to simulate.</p>
         </div>
-        <button
-          onClick={onLoadDemo}
-          className="shrink-0 px-4 py-2 text-sm font-medium text-sky-400 border border-sky-800 rounded-lg hover:bg-sky-950 transition-colors"
-        >
-          Load Demo
-        </button>
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            onClick={onLoadRealScenario}
+            title="TMT: T-Mobile Uncarrier vs AT&T, Verizon, Sprint (March 2013). Known outcome: T-Mobile gained 22M subscribers."
+            className="px-4 py-2 text-sm font-medium text-emerald-400 border border-emerald-800 rounded-lg hover:bg-emerald-950 transition-colors"
+          >
+            Load TMT Scenario
+          </button>
+          <button
+            onClick={onLoadCPGScenario}
+            title="CPG: Coca-Cola pricing discipline vs PepsiCo & Keurig Dr Pepper (Feb 2023). Known outcome: Coke held share, PepsiCo had 9 consecutive quarters of volume decline."
+            className="px-4 py-2 text-sm font-medium text-emerald-400 border border-emerald-800 rounded-lg hover:bg-emerald-950 transition-colors"
+          >
+            Load CPG Scenario
+          </button>
+          <button
+            onClick={onLoadDemo}
+            className="px-4 py-2 text-sm font-medium text-sky-400 border border-sky-800 rounded-lg hover:bg-sky-950 transition-colors"
+          >
+            Load Demo
+          </button>
+        </div>
       </div>
 
       <div className="space-y-4">
@@ -560,6 +752,24 @@ export default function App() {
     setActiveTab('competitors')
   }
 
+  function loadRealScenario() {
+    setYourCompany(TMOBILE_UNCARRIER_SCENARIO.yourCompany)
+    setCompetitors(TMOBILE_UNCARRIER_SCENARIO.competitors)
+    setSimulationResult(null)
+    setError(null)
+    setActiveCompetitor(0)
+    setActiveTab('competitors')
+  }
+
+  function loadCPGScenario() {
+    setYourCompany(COCACOLA_PEPSI_SCENARIO.yourCompany)
+    setCompetitors(COCACOLA_PEPSI_SCENARIO.competitors)
+    setSimulationResult(null)
+    setError(null)
+    setActiveCompetitor(0)
+    setActiveTab('competitors')
+  }
+
   const inputCls = 'w-full px-3 py-2.5 bg-gray-900 border border-gray-700 rounded-lg text-sm text-gray-100 placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent transition-colors'
 
   return (
@@ -594,6 +804,8 @@ export default function App() {
                 yourCompany={yourCompany}
                 setYourCompany={setYourCompany}
                 onLoadDemo={loadDemo}
+                onLoadRealScenario={loadRealScenario}
+                onLoadCPGScenario={loadCPGScenario}
               />
             )}
 

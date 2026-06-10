@@ -42,6 +42,7 @@ export function buildCompetitorSystemPrompt(profile, scenarioContext = {}) {
     signalSummary,
     geographicFocus,
     competitorType,
+    ceoPriorityStatement,
   } = profile;
 
   const {
@@ -108,6 +109,9 @@ COMPETITIVE SCORES:
 
 STRATEGIC INTENT (ranked by dominance — these weights define how you make decisions):
 ${sortedIntent}
+
+CEO STRATEGIC PRIORITY: "${ceoPriorityStatement}"
+(This is the verbatim stated priority of your leadership. Your response must be consistent with this mandate.)
 
 REACTION PATTERN: ${reactionPatternSummary}
 CONSTRAINTS: ${constraintSummary}
@@ -246,6 +250,7 @@ STRICT LANGUAGE RULES:
 - Be direct and opinionated — say "do X by [date]" not "consider whether X might be appropriate"
 - For betterAlternative: set to null if the current move is already the right call given the competitive dynamics — do NOT manufacture an alternative just to have one. Only populate it when a genuinely different move would produce a materially better outcome.
 - For player outcomes: 1-2 plain sentences about what actually happens and why, with a number or fact to anchor it
+- For financialEstimate: anchor every number to the company's actual input revenue or margin. If revenue is $35.3B and you estimate a 2–4% decline, show the dollar range (~$700M–$1.4B). Never invent round numbers unconnected to the inputs. Omit the field entirely if the input financials are insufficient to support a credible range — a missing field is better than a fabricated one.
 - For scenarios: describe what a customer, salesperson, or CFO would actually see and experience
 - For watchlist signals: "Watch for [specific observable thing] — if it happens, it means [plain implication with a number if possible] and you should [concrete action]"
 - For key risks: "Risk: [what could go wrong, with numbers] → [plain consequence]"
@@ -254,10 +259,11 @@ Synthesize these competitive dynamics and respond ONLY with valid JSON in this e
 {
   "marketEquilibrium": string (2-3 plain sentences: paint a picture of what the market looks like 90 days from now after all these moves play out — what does a customer or salesperson actually see?),
   "playerOutcomes": {
-    "yourCompany": { "outcome": "wins"|"neutral"|"loses", "reasoning": string (1-2 plain sentences about what actually happens to this company) },
-    "[competitorName for each competitor]": { "outcome": "wins"|"neutral"|"loses", "reasoning": string }
+    "yourCompany": { "outcome": "wins"|"neutral"|"loses", "reasoning": string (1-2 plain sentences about what actually happens to this company), "financialEstimate": string (ONE sentence with a specific range anchored to actual input financials — e.g. "Estimated 3–5% revenue uplift (~$X–$Y based on $Z revenue base) from [cause] over [timeframe]". Omit if inputs are insufficient.) },
+    "[competitorName for each competitor]": { "outcome": "wins"|"neutral"|"loses", "reasoning": string (1-2 plain sentences), "financialEstimate": string (same format — anchor to this competitor's actual input financials, omit if insufficient) }
   },
   "strategicRecommendation": string (3-5 clear sentences. Start with the single most important thing to do NOW. Then the second priority. Be specific about timing and why. Write like you are the most trusted advisor in the room.),
+  "priorityActions": string[] (exactly 2–3 items — the specific actions the player must take, in priority order. Each item is ONE sentence. Format: "Do [specific action] by [specific timing] — [one-sentence rationale with a real number]." Example: "Lock in 24-month subscriber contracts in the top 5 metro markets within the next 3 weeks — PremiumConnect has 31.5% EBITDA margin and will launch a counter-bundle within one quarter." Do NOT pad to reach 3 items — write 2 if that is the right answer.),
   "betterAlternative": null | {
     "move": string (a clear, specific move in plain English — not a category name),
     "reasoning": string (why this beats the current plan — use plain cause-and-effect),
