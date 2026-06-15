@@ -210,6 +210,19 @@ const TMOBILE_UNCARRIER_SCENARIO = {
     companyType: 'disruptor',
     marketGeography: 'United States',
     marketOverview: 'US wireless market with ~300M subscribers (2013). AT&T and Verizon hold ~65% combined market share. Market transitioning to smartphones and LTE data plans. Monthly postpaid churn ranges 1.5–2.8% across carriers. AT&T and Verizon both restructured pricing upward in 2011–2012. Sprint is financially distressed from the Nextel integration and Network Vision rebuild. Growing consumer frustration with 2-year contracts, device upgrade restrictions, and opaque fees.',
+    revenueGrowthRate: -3,        // FY2012: $21.3B vs $21.9B (2011) — 14 consecutive quarters of postpaid net losses. Source: TMUS 2012 10-K
+    ebitdaMargin: 22,             // [calc] Adjusted OIBDA ~$4.7B / $21.3B revenue. Source: TMUS 2012 10-K
+    cashPosition: 'moderate',     // $3B AT&T breakup fee received + ~$1.5B operating cash; offset by MetroPCS merger costs
+    debtToEbitda: 3.2,            // [calc] Long-term debt ~$15.1B / ~$4.7B adjusted OIBDA. Source: TMUS 2012 10-K
+    rdSpendPct: 1.5,              // Network investment heavy but classified as capex; minimal formal R&D line item
+    marketShareTrend: 'losing',   // 4th-place carrier; losing postpaid net adds to AT&T and Verizon for 14 consecutive quarters
+    headcountTrend: 'flat',       // ~35,000 employees pre-MetroPCS merger. Source: TMUS 2012 DEF 14A
+    ceoPriorityStatement: "We are the un-carrier. We will do what the big guys refuse to do — eliminate contracts, end the two-year upgrade cycle, and compete on the customer's terms. Our LTE rollout is behind AT&T and Verizon but our pricing model is our weapon. We have 12 months to prove this works before the MetroPCS merger closes. — John Legere, T-Mobile CEO (strategic mandate, March 2013)",
+    lastThreePriceMoves: [
+      { direction: 'down', magnitude: 15, context: 'March 2013: Uncarrier launch — Simple Choice plans at $50/month, ~15% below comparable AT&T/Verizon postpaid plans with no annual contract. Source: T-Mobile Uncarrier press release Mar 26 2013.' },
+      { direction: 'hold', magnitude: 0, context: 'FY2012: Held pricing flat while losing subscribers — previous management unwilling to cut ahead of AT&T acquisition attempt.' },
+      { direction: 'hold', magnitude: 0, context: 'FY2011: Maintained rate card pricing through AT&T merger attempt and post-breakup period.' },
+    ],
   },
   competitors: [
     {
@@ -312,6 +325,19 @@ const COCACOLA_PEPSI_SCENARIO = {
     companyType: 'incumbent_leader',
     marketGeography: 'United States',
     marketOverview: "US beverage market ~$100B+ annual retail sales. CSD category declining ~1-2% annually by volume as consumers shift to water and energy drinks. Coca-Cola holds 46.3% US CSD share vs PepsiCo 24.7% (Statista 2022). All major players took 10-14% price increases in 2021-2022 to offset commodity inflation (US CPI peaked 9.1% June 2022). Consumer wallets under pressure — low-income households beginning to trade down to private label. Private label beverage shelf space expanding at major retailers.",
+    revenueGrowthRate: 11,        // FY2022: $43.0B vs $38.7B (2021). Source: KO 10-K FY2022 (SEC)
+    ebitdaMargin: 32,             // [calc] Op. income $10.9B + D&A ~$2.7B = $13.6B / $43.0B revenue. Source: KO FY2022 10-K
+    cashPosition: 'strong',       // Cash + short-term investments ~$9.5B at FY2022 year-end. Source: KO FY2022 10-K
+    debtToEbitda: 2.5,            // [calc] Total debt ~$34B / ~$13.6B EBITDA. Source: KO FY2022 10-K
+    rdSpendPct: 0,                // CPG — R&D spend minimal; marketing investment (~$4B) is the primary competitive lever
+    marketShareTrend: 'stable',   // 46.3% US CSD share — holding vs PepsiCo 24.7% (Statista 2022); no significant gain or loss
+    headcountTrend: 'flat',       // ~79,000 employees (2022). Source: KO DEF 14A FY2022
+    ceoPriorityStatement: "There will be pricing in 2023 to reflect the continuing inflation in import and SG&A costs. We need to own that pricing by delivering value consumers appreciate through marketing and innovation. Our 46% market share is a competitive moat we intend to defend through brand investment, not promotional discounting. — James Quincey, Coca-Cola CEO (Q4 2022 earnings call, Feb 9, 2023)",
+    lastThreePriceMoves: [
+      { direction: 'up', magnitude: 12, context: 'FY2022 full year: ~12% blended price/mix increase across US portfolio to offset commodity and packaging inflation. Source: KO FY2022 10-K (SEC).' },
+      { direction: 'up', magnitude: 10, context: 'FY2021: ~10% effective price increase across sparkling beverages — first major pricing cycle of the post-COVID inflation period. Source: KO FY2021 10-K (SEC).' },
+      { direction: 'hold', magnitude: 0, context: 'H1 2023 guidance: holding pricing; no further increases planned beyond carryover from 2022 rounds. Focus shifts to marketing investment to defend volume. Source: KO Q4 2022 earnings call, Feb 9, 2023.' },
+    ],
   },
   competitors: [
     {
@@ -574,6 +600,80 @@ function ScenarioSetupTab({ yourCompany, setYourCompany, onLoadDemo, onLoadRealS
         </div>
       </div>
 
+      {/* ── Your Financial Profile ─────────────────────────────────────── */}
+      <div className="rounded-xl p-5 space-y-4" style={{ background: '#111827', border: '1px solid #1f2937' }}>
+        <div>
+          <p className="text-sm font-semibold text-white">Your Financial Profile</p>
+          <p className="text-xs text-gray-500 mt-0.5">Used to anchor financial estimates and assess your capacity to execute and sustain the move.</p>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <Field label="Revenue Growth Rate (%)" hint="YoY revenue growth at time of this move.">
+            <input type="number" step="0.1" value={yourCompany.revenueGrowthRate}
+              onChange={e => update('revenueGrowthRate', parseFloat(e.target.value) || 0)}
+              className={inputCls} placeholder="e.g. 11" />
+          </Field>
+          <Field label="EBITDA Margin (%)">
+            <input type="number" step="0.1" value={yourCompany.ebitdaMargin}
+              onChange={e => update('ebitdaMargin', parseFloat(e.target.value) || 0)}
+              className={inputCls} placeholder="e.g. 32" />
+          </Field>
+          <Field label="Debt-to-EBITDA (x)">
+            <input type="number" step="0.1" value={yourCompany.debtToEbitda}
+              onChange={e => update('debtToEbitda', parseFloat(e.target.value) || 0)}
+              className={inputCls} placeholder="e.g. 2.5" />
+          </Field>
+          <Field label="R&D Spend (% of revenue)" hint="Optional — leave 0 if not applicable.">
+            <input type="number" step="0.1" value={yourCompany.rdSpendPct}
+              onChange={e => update('rdSpendPct', parseFloat(e.target.value) || 0)}
+              className={inputCls} placeholder="e.g. 4" />
+          </Field>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <Field label="Cash Position">
+            <div className="flex rounded-lg overflow-hidden border border-gray-700">
+              {['weak','moderate','strong'].map(v => (
+                <button key={v} onClick={() => update('cashPosition', v)}
+                  className="flex-1 py-2 text-xs font-semibold capitalize transition-colors"
+                  style={{ background: yourCompany.cashPosition === v ? '#1e3a5f' : '#111827', color: yourCompany.cashPosition === v ? '#7dd3fc' : '#6b7280' }}>
+                  {v}
+                </button>
+              ))}
+            </div>
+          </Field>
+          <Field label="Market Share Trend">
+            <div className="flex rounded-lg overflow-hidden border border-gray-700">
+              {['losing','stable','gaining'].map(v => (
+                <button key={v} onClick={() => update('marketShareTrend', v)}
+                  className="flex-1 py-2 text-xs font-semibold capitalize transition-colors"
+                  style={{ background: yourCompany.marketShareTrend === v ? '#1e3a5f' : '#111827', color: yourCompany.marketShareTrend === v ? '#7dd3fc' : '#6b7280' }}>
+                  {v}
+                </button>
+              ))}
+            </div>
+          </Field>
+          <Field label="Headcount Trend">
+            <div className="flex rounded-lg overflow-hidden border border-gray-700">
+              {['shrinking','flat','growing'].map(v => (
+                <button key={v} onClick={() => update('headcountTrend', v)}
+                  className="flex-1 py-2 text-xs font-semibold capitalize transition-colors"
+                  style={{ background: yourCompany.headcountTrend === v ? '#1e3a5f' : '#111827', color: yourCompany.headcountTrend === v ? '#7dd3fc' : '#6b7280' }}>
+                  {v}
+                </button>
+              ))}
+            </div>
+          </Field>
+        </div>
+
+        <Field label="CEO Priority Statement" hint="Verbatim or paraphrased strategic mandate from leadership.">
+          <textarea value={yourCompany.ceoPriorityStatement}
+            onChange={e => update('ceoPriorityStatement', e.target.value)}
+            placeholder="e.g. We will compete on brand strength and pricing discipline — not promotional discounting."
+            rows={2} className={`${inputCls} resize-none`} />
+        </Field>
+      </div>
+
       {yourCompany.name && yourCompany.strategicMove && (
         <div className="p-4 bg-emerald-950 border border-emerald-800 rounded-lg">
           <p className="text-sm text-emerald-300">
@@ -710,20 +810,31 @@ function SimulateTab({ isLoading, error, simulationResult, onRun, onRerun, onBac
 export default function App() {
   const [activeTab, setActiveTab] = useState('setup')
   const [activeCompetitor, setActiveCompetitor] = useState(0)
-  const [yourCompany, setYourCompany] = useState({ name: '', strategicMove: '', context: '', industry: '', industryOther: '', companyType: '', marketGeography: '', marketOverview: '' })
+  const [yourCompany, setYourCompany] = useState({ name: '', strategicMove: '', context: '', industry: '', industryOther: '', companyType: '', marketGeography: '', marketOverview: '', revenueGrowthRate: 0, ebitdaMargin: 0, cashPosition: 'moderate', debtToEbitda: 0, rdSpendPct: 0, marketShareTrend: 'stable', headcountTrend: 'flat', ceoPriorityStatement: '', lastThreePriceMoves: [] })
   const [competitors, setCompetitors] = useState([
     defaultCompetitor(),
     defaultCompetitor(),
     defaultCompetitor(),
   ])
-  const [simulationResult, setSimulationResult] = useState(null)
+  const [simulationResult, setSimulationResult] = useState(() => {
+    try {
+      const saved = sessionStorage.getItem('competitorSim_lastResult')
+      return saved ? JSON.parse(saved) : null
+    } catch { return null }
+  })
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState(null)
 
   const canRunSim = Boolean(yourCompany.name.trim() && yourCompany.strategicMove.trim())
 
+  function persistResult(data) {
+    try { sessionStorage.setItem('competitorSim_lastResult', JSON.stringify(data)) } catch { /* quota exceeded */ }
+    setSimulationResult(data)
+  }
+
   async function runSimulation() {
     setSimulationResult(null)
+    sessionStorage.removeItem('competitorSim_lastResult')
     setError(null)
     setIsLoading(true)
     try {
@@ -734,7 +845,7 @@ export default function App() {
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || `Server error ${res.status}`)
-      setSimulationResult(data)
+      persistResult(data)
     } catch (err) {
       setError(err.message)
     } finally {
@@ -747,6 +858,7 @@ export default function App() {
     setYourCompany(scenario.yourCompany)
     setCompetitors(scenario.competitors)
     setSimulationResult(null)
+    sessionStorage.removeItem('competitorSim_lastResult')
     setError(null)
     setActiveCompetitor(0)
     setActiveTab('competitors')
@@ -756,6 +868,7 @@ export default function App() {
     setYourCompany(TMOBILE_UNCARRIER_SCENARIO.yourCompany)
     setCompetitors(TMOBILE_UNCARRIER_SCENARIO.competitors)
     setSimulationResult(null)
+    sessionStorage.removeItem('competitorSim_lastResult')
     setError(null)
     setActiveCompetitor(0)
     setActiveTab('competitors')
@@ -765,6 +878,7 @@ export default function App() {
     setYourCompany(COCACOLA_PEPSI_SCENARIO.yourCompany)
     setCompetitors(COCACOLA_PEPSI_SCENARIO.competitors)
     setSimulationResult(null)
+    sessionStorage.removeItem('competitorSim_lastResult')
     setError(null)
     setActiveCompetitor(0)
     setActiveTab('competitors')
