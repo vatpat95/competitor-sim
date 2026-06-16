@@ -1,9 +1,9 @@
 import { runSimulation } from './agents.js';
-import { buildCompetitorProfile } from './profileBuilder.js';
 
-// ── Demo competitor profiles ──────────────────────────────────────────────────
+// ── Demo competitor raw inputs ────────────────────────────────────────────────
+// NOTE: These are raw inputs. agents.js will build v2 profiles internally.
 
-const valuenet = buildCompetitorProfile({
+const valuenet = {
   name: "ValueNet",
   revenueGrowthRate: 18.5,
   ebitdaMargin: 12.3,
@@ -27,9 +27,17 @@ const valuenet = buildCompetitorProfile({
     "Partnership with mid-market procurement platform",
   ],
   regulatoryConstraints: "",
-});
+  // v2 new fields
+  annualRevenue: 3000,
+  ownershipType: "public",
+  operationalFlexibility: "high",
+  switchingFriction: "medium",
+  exposureToMove: 65,
+  marketOverlapPct: 80,
+  responseConstraintLevel: "none",
+};
 
-const premiumconnect = buildCompetitorProfile({
+const premiumconnect = {
   name: "PremiumConnect",
   revenueGrowthRate: 7.2,
   ebitdaMargin: 31.5,
@@ -52,9 +60,17 @@ const premiumconnect = buildCompetitorProfile({
     "Renewed multi-year contracts with 4 Fortune 500 accounts",
   ],
   regulatoryConstraints: "Subject to enterprise data residency requirements in EU; limits rapid geographic expansion.",
-});
+  // v2 new fields
+  annualRevenue: 5500,
+  ownershipType: "public",
+  operationalFlexibility: "medium",
+  switchingFriction: "low",
+  exposureToMove: 20,
+  marketOverlapPct: 40,
+  responseConstraintLevel: "moderate",
+};
 
-const regionalplus = buildCompetitorProfile({
+const regionalplus = {
   name: "RegionalPlus",
   revenueGrowthRate: 3.1,
   ebitdaMargin: 8.7,
@@ -77,7 +93,15 @@ const regionalplus = buildCompetitorProfile({
     "Announced 'Regional Loyalty' pricing program for long-term customers",
   ],
   regulatoryConstraints: "State-level telecom licensing in 6 states limits ability to exit or restructure quickly.",
-});
+  // v2 new fields
+  annualRevenue: 800,
+  ownershipType: "family_private",
+  operationalFlexibility: "low",
+  switchingFriction: "high",
+  exposureToMove: 45,
+  marketOverlapPct: 50,
+  responseConstraintLevel: "severe",
+};
 
 // ── Your company ──────────────────────────────────────────────────────────────
 
@@ -85,6 +109,14 @@ const yourCompany = {
   name: "OurCo",
   strategicMove: "Launch of a new mid-market bundle priced 10% above ValueNet but with a 90-day free trial and dedicated onboarding",
   context: "We are targeting ValueNet's recent mid-market gains with a value-add play rather than a price war, betting that trial conversion and onboarding quality will differentiate us.",
+  // v2 financial fields (for relative firepower calculation)
+  revenueGrowthRate: 15.0,
+  ebitdaMargin: 22.0,
+  cashPosition: "strong",
+  debtToEbitda: 1.5,
+  operationalFlexibility: "high",
+  annualRevenue: 4500, // $4.5B
+  moveType: "product_launch",
 };
 
 // ── Run simulation ────────────────────────────────────────────────────────────
@@ -99,6 +131,23 @@ for (const entry of result.rounds.round1) {
   console.log(JSON.stringify(entry.response, null, 2));
 }
 
+// ── Print v2 Predicted Reaction Profiles ──────────────────────────────────────
+console.log("\n=== PREDICTED REACTION PROFILES (v2) ===");
+for (const profile of result.competitorProfiles) {
+  console.log(`\n[${profile.name}]`);
+  console.log("Relative Firepower:", profile.relativeLabel);
+  console.log("Response Capacity:", profile.responseCapacityScore);
+  console.log("Motivation:", profile.motivationScore);
+  console.log("Awareness:", profile.awarenessScore);
+  const prp = profile.predictedReactionProfile;
+  console.log("Predicted Reaction Profile:");
+  console.log(`  - Likelihood: ${prp.responseLikelihood}%`);
+  console.log(`  - Speed: ${prp.responseSpeed}`);
+  console.log(`  - Intensity: ${prp.responseIntensity}`);
+  console.log(`  - Likely vectors: ${prp.likelyResponseVectors.join(", ")}`);
+  console.log(`  - Confidence: ${prp.confidence}`);
+}
+
 // ── Print equilibrium ─────────────────────────────────────────────────────────
 console.log("\n=== EQUILIBRIUM REACHED ===", result.equilibriumReached);
 console.log("Total rounds run:", result.totalRounds);
@@ -109,6 +158,38 @@ console.log(JSON.stringify(result.orchestratorOutput, null, 2));
 
 // ── Assertions ────────────────────────────────────────────────────────────────
 const errors = [];
+
+// Check scoring version is v2.0
+if (result.simulationMetadata?.scoringVersion !== 'v2.0') {
+  errors.push(`Scoring version should be 'v2.0', got '${result.simulationMetadata?.scoringVersion}'`);
+}
+
+// Check yourCompanyProfile exists (v2)
+if (!result.yourCompanyProfile) {
+  errors.push(`yourCompanyProfile is missing (v2 requirement)`);
+}
+
+// All 3 competitors have Predicted Reaction Profile (v2)
+for (const profile of result.competitorProfiles) {
+  if (!profile.predictedReactionProfile) {
+    errors.push(`${profile.name}: missing predictedReactionProfile (v2)`);
+  }
+  const prp = profile.predictedReactionProfile;
+  if (prp) {
+    if (typeof prp.responseLikelihood !== 'number' || prp.responseLikelihood < 0 || prp.responseLikelihood > 100) {
+      errors.push(`${profile.name}: predictedReactionProfile.responseLikelihood invalid`);
+    }
+    if (!['fast', 'moderate', 'slow'].includes(prp.responseSpeed)) {
+      errors.push(`${profile.name}: predictedReactionProfile.responseSpeed invalid (${prp.responseSpeed})`);
+    }
+    if (typeof prp.responseIntensity !== 'number' || prp.responseIntensity < 0 || prp.responseIntensity > 100) {
+      errors.push(`${profile.name}: predictedReactionProfile.responseIntensity invalid`);
+    }
+    if (!Array.isArray(prp.likelyResponseVectors) || prp.likelyResponseVectors.length === 0) {
+      errors.push(`${profile.name}: predictedReactionProfile.likelyResponseVectors missing or empty`);
+    }
+  }
+}
 
 // All 3 competitors have primaryResponse.type
 for (const entry of result.rounds.round1) {

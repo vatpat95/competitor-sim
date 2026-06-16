@@ -29,6 +29,25 @@ const COMPETITOR_TYPE_OPTIONS = [
   { value: 'disruptor',           label: 'Disruptor / New Entrant' },
 ]
 
+// v2: move type — drives stakes weighting and awareness defaults (spec section 2.1)
+const MOVE_TYPE_OPTIONS = [
+  { value: 'price_cut',           label: 'Price cut' },
+  { value: 'price_increase',      label: 'Price increase' },
+  { value: 'product_launch',      label: 'Product launch' },
+  { value: 'market_entry',        label: 'Market entry' },
+  { value: 'bundle_promo',        label: 'Bundle / promo' },
+  { value: 'capacity_expansion',  label: 'Capacity expansion' },
+  { value: 'other',               label: 'Other' },
+]
+
+// v2: move visibility — overrides the move-type default (spec section 2.4)
+const MOVE_VISIBILITY_OPTIONS = [
+  { value: '',       label: 'Auto (based on move type)' },
+  { value: 'high',   label: 'High — hard to miss' },
+  { value: 'medium', label: 'Medium — normal market monitoring' },
+  { value: 'low',    label: 'Low — easy to overlook' },
+]
+
 // ── Defaults ──────────────────────────────────────────────────────────────────
 
 function defaultCompetitor() {
@@ -47,6 +66,14 @@ function defaultCompetitor() {
     recentNewsSignals: [],
     regulatoryConstraints: '',
     competitorType: '',
+    // v2 — all optional, defaults mirror backend/scoringConfig.js
+    annualRevenue: null,
+    ownershipType: 'public',
+    operationalFlexibility: 'medium',
+    switchingFriction: 'medium',
+    exposureToMove: 50,
+    marketOverlapPct: 70,
+    responseConstraintLevel: 'none',
   }
 }
 
@@ -82,6 +109,14 @@ const TELECOM_COMPETITORS = [
       'Partnership with mid-market procurement platform',
     ],
     regulatoryConstraints: '',
+    // v2
+    annualRevenue: 3000,
+    ownershipType: 'public',
+    operationalFlexibility: 'high',
+    switchingFriction: 'medium',
+    exposureToMove: 65,
+    marketOverlapPct: 80,
+    responseConstraintLevel: 'none',
   },
   {
     name: 'PremiumConnect',
@@ -106,6 +141,14 @@ const TELECOM_COMPETITORS = [
       'Renewed multi-year contracts with 4 Fortune 500 accounts',
     ],
     regulatoryConstraints: 'Subject to enterprise data residency requirements in EU; limits rapid geographic expansion.',
+    // v2
+    annualRevenue: 5500,
+    ownershipType: 'public',
+    operationalFlexibility: 'medium',
+    switchingFriction: 'high',
+    exposureToMove: 20,
+    marketOverlapPct: 40,
+    responseConstraintLevel: 'moderate',
   },
   {
     name: 'RegionalPlus',
@@ -130,6 +173,14 @@ const TELECOM_COMPETITORS = [
       "Announced 'Regional Loyalty' pricing program for long-term customers",
     ],
     regulatoryConstraints: 'State-level telecom licensing in 6 states limits ability to exit or restructure quickly.',
+    // v2
+    annualRevenue: 800,
+    ownershipType: 'family_private',
+    operationalFlexibility: 'low',
+    switchingFriction: 'high',
+    exposureToMove: 45,
+    marketOverlapPct: 50,
+    responseConstraintLevel: 'severe',
   },
 ]
 
@@ -148,6 +199,8 @@ const DEMO_SCENARIOS = [
       companyType: 'incumbent_leader',
       marketGeography: 'North America',
       marketOverview: 'Mature market with ~2% annual growth, high churn (18–22% annually), and mid-market consolidation driven by low-cost challengers. Enterprise segment is sticky; SMB and mid-market are the current battleground.',
+      moveType: 'price_cut',
+      ebitdaMargin: 18, debtToEbitda: 2.2, cashPosition: 'moderate', operationalFlexibility: 'medium', annualRevenue: 4500,
     },
     competitors: TELECOM_COMPETITORS,
   },
@@ -169,6 +222,8 @@ const DEMO_SCENARIOS = [
       companyType: 'incumbent_leader',
       marketGeography: 'North America',
       marketOverview: 'Mature market with ~2% annual growth, high churn (18–22% annually), and mid-market consolidation driven by low-cost challengers. Enterprise segment is sticky; SMB and mid-market are the current battleground.',
+      moveType: 'bundle_promo',
+      ebitdaMargin: 18, debtToEbitda: 2.2, cashPosition: 'moderate', operationalFlexibility: 'medium', annualRevenue: 4500,
     },
     competitors: TELECOM_COMPETITORS,
   },
@@ -189,6 +244,8 @@ const DEMO_SCENARIOS = [
       companyType: 'incumbent_leader',
       marketGeography: 'North America',
       marketOverview: 'Mature market with ~2% annual growth, high churn (18–22% annually), and mid-market consolidation driven by low-cost challengers. Enterprise segment is sticky; SMB and mid-market are the current battleground.',
+      moveType: 'market_entry',
+      ebitdaMargin: 18, debtToEbitda: 2.2, cashPosition: 'moderate', operationalFlexibility: 'medium', annualRevenue: 4500,
     },
     competitors: TELECOM_COMPETITORS,
   },
@@ -210,6 +267,9 @@ const TMOBILE_UNCARRIER_SCENARIO = {
     companyType: 'disruptor',
     marketGeography: 'United States',
     marketOverview: 'US wireless market with ~300M subscribers (2013). AT&T and Verizon hold ~65% combined market share. Market transitioning to smartphones and LTE data plans. Monthly postpaid churn ranges 1.5–2.8% across carriers. AT&T and Verizon both restructured pricing upward in 2011–2012. Sprint is financially distressed from the Nextel integration and Network Vision rebuild. Growing consumer frustration with 2-year contracts, device upgrade restrictions, and opaque fees.',
+    moveType: 'price_cut',
+    // Source: T-Mobile USA Q4 2012 earnings; figures are pre-MetroPCS-merger standalone T-Mobile USA
+    ebitdaMargin: 22, debtToEbitda: 2.0, cashPosition: 'moderate', operationalFlexibility: 'medium', annualRevenue: 19700,
   },
   competitors: [
     {
@@ -312,6 +372,9 @@ const COCACOLA_PEPSI_SCENARIO = {
     companyType: 'incumbent_leader',
     marketGeography: 'United States',
     marketOverview: "US beverage market ~$100B+ annual retail sales. CSD category declining ~1-2% annually by volume as consumers shift to water and energy drinks. Coca-Cola holds 46.3% US CSD share vs PepsiCo 24.7% (Statista 2022). All major players took 10-14% price increases in 2021-2022 to offset commodity inflation (US CPI peaked 9.1% June 2022). Consumer wallets under pressure — low-income households beginning to trade down to private label. Private label beverage shelf space expanding at major retailers.",
+    moveType: 'price_increase',
+    // Source: Coca-Cola FY2022 10-K (SEC)
+    ebitdaMargin: 29, debtToEbitda: 2.1, cashPosition: 'strong', operationalFlexibility: 'medium', annualRevenue: 43000,
   },
   competitors: [
     {
@@ -486,6 +549,34 @@ function ScenarioSetupTab({ yourCompany, setYourCompany, onLoadDemo, onLoadRealS
           />
         </Field>
 
+        <div className="grid grid-cols-2 gap-4">
+          <Field label="Move type" hint="Selects how stakes and visibility are weighted for each competitor.">
+            <select
+              value={yourCompany.moveType || 'price_cut'}
+              onChange={e => update('moveType', e.target.value)}
+              className={selectCls}
+              style={{ background: '#111827' }}
+            >
+              {MOVE_TYPE_OPTIONS.map(o => (
+                <option key={o.value} value={o.value}>{o.label}</option>
+              ))}
+            </select>
+          </Field>
+
+          <Field label="Move visibility (optional)" hint="How noticeable this move is — leave on auto unless you have a reason to override.">
+            <select
+              value={yourCompany.moveVisibility || ''}
+              onChange={e => update('moveVisibility', e.target.value)}
+              className={selectCls}
+              style={{ background: '#111827' }}
+            >
+              {MOVE_VISIBILITY_OPTIONS.map(o => (
+                <option key={o.value} value={o.value}>{o.label}</option>
+              ))}
+            </select>
+          </Field>
+        </div>
+
         <Field
           label="Context (optional)"
           hint="Additional background that helps the simulation understand your rationale."
@@ -570,6 +661,80 @@ function ScenarioSetupTab({ yourCompany, setYourCompany, onLoadDemo, onLoadRealS
               rows={3}
               className={`${inputCls} resize-none`}
             />
+          </Field>
+        </div>
+      </div>
+
+      {/* v2: Your Company Financials — optional, used to compute relative firepower vs. competitors */}
+      <div>
+        <div className="flex items-center gap-2 mb-1">
+          <div className="w-1 h-4 rounded-full" style={{ background: '#0ea5e9' }} />
+          <h3 className="text-xs font-bold uppercase tracking-wider" style={{ color: '#4a7fa5' }}>Your Company Financials <span className="normal-case font-normal text-gray-600">(optional — used to compare your strength against each competitor)</span></h3>
+        </div>
+        <div className="grid grid-cols-2 gap-4 mt-3">
+          <Field label="Revenue growth rate (%)">
+            <input
+              type="number"
+              value={yourCompany.revenueGrowthRate === 0 ? '' : yourCompany.revenueGrowthRate}
+              onChange={e => update('revenueGrowthRate', parseFloat(e.target.value) || 0)}
+              placeholder="0"
+              step="0.1"
+              className={inputCls}
+            />
+          </Field>
+          <Field label="EBITDA margin (%)">
+            <input
+              type="number"
+              value={yourCompany.ebitdaMargin === 0 ? '' : yourCompany.ebitdaMargin}
+              onChange={e => update('ebitdaMargin', parseFloat(e.target.value) || 0)}
+              placeholder="15"
+              step="0.1"
+              className={inputCls}
+            />
+          </Field>
+          <Field label="Debt-to-EBITDA">
+            <input
+              type="number"
+              value={yourCompany.debtToEbitda === 0 ? '' : yourCompany.debtToEbitda}
+              onChange={e => update('debtToEbitda', parseFloat(e.target.value) || 0)}
+              placeholder="2"
+              step="0.1"
+              className={inputCls}
+            />
+          </Field>
+          <Field label="Annual revenue ($M, optional)" hint="Used to scale absolute size — leave blank if unknown.">
+            <input
+              type="number"
+              value={yourCompany.annualRevenue ?? ''}
+              onChange={e => update('annualRevenue', e.target.value === '' ? null : parseFloat(e.target.value))}
+              placeholder="e.g. 5000"
+              step="1"
+              className={inputCls}
+            />
+          </Field>
+          <Field label="Cash position">
+            <select
+              value={yourCompany.cashPosition}
+              onChange={e => update('cashPosition', e.target.value)}
+              className={selectCls}
+              style={{ background: '#111827' }}
+            >
+              <option value="strong">Strong</option>
+              <option value="moderate">Moderate</option>
+              <option value="weak">Weak</option>
+            </select>
+          </Field>
+          <Field label="Operational flexibility">
+            <select
+              value={yourCompany.operationalFlexibility}
+              onChange={e => update('operationalFlexibility', e.target.value)}
+              className={selectCls}
+              style={{ background: '#111827' }}
+            >
+              <option value="high">High</option>
+              <option value="medium">Medium</option>
+              <option value="low">Low</option>
+            </select>
           </Field>
         </div>
       </div>
@@ -710,7 +875,19 @@ function SimulateTab({ isLoading, error, simulationResult, onRun, onRerun, onBac
 export default function App() {
   const [activeTab, setActiveTab] = useState('setup')
   const [activeCompetitor, setActiveCompetitor] = useState(0)
-  const [yourCompany, setYourCompany] = useState({ name: '', strategicMove: '', context: '', industry: '', industryOther: '', companyType: '', marketGeography: '', marketOverview: '' })
+  const [yourCompany, setYourCompany] = useState({
+    name: '', strategicMove: '', context: '', industry: '', industryOther: '', companyType: '', marketGeography: '', marketOverview: '',
+    // v2 — your own company's financials, used to compute relative firepower vs. competitors
+    revenueGrowthRate: 0,
+    ebitdaMargin: 15,
+    cashPosition: 'moderate',
+    debtToEbitda: 2,
+    operationalFlexibility: 'medium',
+    annualRevenue: null,
+    // v2 — move type/visibility drive stakes weighting and awareness (spec sections 2.1, 2.4)
+    moveType: 'price_cut',
+    moveVisibility: '',
+  })
   const [competitors, setCompetitors] = useState([
     defaultCompetitor(),
     defaultCompetitor(),
@@ -853,6 +1030,7 @@ export default function App() {
                 <CompetitorProfileForm
                   competitor={competitors[activeCompetitor]}
                   index={activeCompetitor}
+                  yourCompany={yourCompany}
                   onChange={(idx, updated) =>
                     setCompetitors(prev => prev.map((c, j) => j === idx ? updated : c))
                   }

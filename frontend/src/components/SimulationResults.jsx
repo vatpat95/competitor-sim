@@ -65,10 +65,19 @@ function TimingBadge({ timing }) {
   )
 }
 
-function ThreatBadge({ cap, agg }) {
-  if (cap >= 70 && agg >= 70) return <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold border bg-red-900/60 text-red-300 border-red-800">HIGH</span>
-  if (cap >= 40 && agg >= 45) return <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold border bg-amber-900/60 text-amber-300 border-amber-800">MEDIUM</span>
+function ThreatBadge({ cap, motivation }) {
+  if (cap >= 70 && motivation >= 65) return <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold border bg-red-900/60 text-red-300 border-red-800">HIGH</span>
+  if (cap >= 40 && motivation >= 40) return <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold border bg-amber-900/60 text-amber-300 border-amber-800">MEDIUM</span>
   return <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold border bg-gray-800 text-gray-400 border-gray-700">LOW</span>
+}
+
+function SpeedTag({ speed }) {
+  const map = {
+    fast:     'text-red-400',
+    moderate: 'text-amber-400',
+    slow:     'text-blue-400',
+  }
+  return <span className={map[speed] ?? 'text-gray-400'}>{speed ?? '—'}</span>
 }
 
 function OutcomePill({ outcome }) {
@@ -248,8 +257,11 @@ function competitorFinalData(r1entry, r2entry) {
   const r1resp = r1entry?.response
   const final = r2?.primaryResponse ?? r1resp?.primaryResponse
   const watch = r2?.watchSignal ?? r1resp?.watchSignal
-  const cap = r1entry.profile?.financialCapacityScore ?? 0
-  const agg = r1entry.profile?.aggressionIndex ?? 0
+  const profile = r1entry.profile ?? {}
+  const cap = profile.responseCapacityScore ?? 0
+  const motivation = profile.motivationScore ?? 0
+  const relativeLabel = profile.relativeLabel
+  const reactionProfile = profile.predictedReactionProfile
   const typeChanged = r2 && r1resp?.primaryResponse?.type !== r2?.primaryResponse?.type
 
   const isMagnitudeIntensity = ['bundle_add', 'marketing_surge', 'niche_pivot', 'alliance', 'no_response'].includes(final?.type)
@@ -257,7 +269,7 @@ function competitorFinalData(r1entry, r2entry) {
     ? (isMagnitudeIntensity ? `${final.magnitude}/10 intensity` : `${final.magnitude}%`)
     : null
 
-  return { final, watch, cap, agg, typeChanged, magnitude, rationale: final?.rationale }
+  return { final, watch, cap, motivation, relativeLabel, reactionProfile, typeChanged, magnitude, rationale: final?.rationale }
 }
 
 function ImplicationCell({ text }) {
@@ -291,7 +303,7 @@ function CompetitiveResponseMatrix({ result }) {
       <div className="rounded-xl overflow-hidden" style={{ border: '1px solid #1f2937' }}>
         {/* Table header */}
         <div className="grid text-xs font-bold uppercase tracking-wider text-gray-500 px-4 py-3"
-          style={{ gridTemplateColumns: '1.2fr 1.8fr 1fr 0.7fr 2fr', background: '#0d1117', borderBottom: '1px solid #1f2937' }}>
+          style={{ gridTemplateColumns: '1.3fr 1.6fr 1fr 0.9fr 2fr', background: '#0d1117', borderBottom: '1px solid #1f2937' }}>
           <div>Competitor</div>
           <div>Expected Response</div>
           <div>Timing</div>
@@ -300,7 +312,7 @@ function CompetitiveResponseMatrix({ result }) {
         </div>
 
         {r1.map((entry, i) => {
-          const { final, watch, cap, agg, typeChanged, magnitude } = competitorFinalData(entry, r2[i])
+          const { final, watch, cap, motivation, relativeLabel, reactionProfile, typeChanged, magnitude } = competitorFinalData(entry, r2[i])
           const implication = watch ?? final?.rationale ?? '—'
 
           return (
@@ -308,7 +320,7 @@ function CompetitiveResponseMatrix({ result }) {
               key={entry.competitorName}
               className="grid items-start px-4 py-4 text-sm gap-x-4"
               style={{
-                gridTemplateColumns: '1.2fr 1.8fr 1fr 0.7fr 2fr',
+                gridTemplateColumns: '1.3fr 1.6fr 1fr 0.9fr 2fr',
                 borderTop: i > 0 ? '1px solid #1f2937' : undefined,
                 background: i % 2 === 0 ? '#111827' : '#0f172a',
               }}
@@ -316,6 +328,9 @@ function CompetitiveResponseMatrix({ result }) {
               {/* Competitor */}
               <div>
                 <p className="font-semibold text-white text-sm">{entry.competitorName}</p>
+                {relativeLabel && (
+                  <p className="text-xs text-gray-500 mt-0.5">{relativeLabel}</p>
+                )}
                 {typeChanged && (
                   <span className="text-xs text-indigo-400 mt-0.5">↻ Adjusted</span>
                 )}
@@ -334,7 +349,12 @@ function CompetitiveResponseMatrix({ result }) {
 
               {/* Threat */}
               <div>
-                <ThreatBadge cap={cap} agg={agg} />
+                <ThreatBadge cap={cap} motivation={motivation} />
+                {reactionProfile && (
+                  <p className="text-xs text-gray-500 mt-1">
+                    {Math.round(reactionProfile.responseLikelihood)}% likely · <SpeedTag speed={reactionProfile.responseSpeed} />
+                  </p>
+                )}
               </div>
 
               {/* Implication */}
@@ -453,7 +473,7 @@ function capacityLabel(v) {
 
 function SensitivityPanel({ baseResult, yourCompany, rawCompetitors, onResultUpdate }) {
   const firstName = rawCompetitors[0]?.name || 'Competitor A'
-  const defaultCap = Math.round(baseResult.competitorProfiles?.[0]?.financialCapacityScore ?? 70)
+  const defaultCap = Math.round(baseResult.competitorProfiles?.[0]?.responseCapacityScore ?? 70)
   const defaultPrice = extractPriceMagnitude(yourCompany.strategicMove)
 
   const [capStrength, setCapStrength] = useState(defaultCap)

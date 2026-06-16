@@ -7,6 +7,11 @@ import {
   buildCompetitorRoundPrompt,
   buildOrchestratorPrompt,
 } from './prompts.js';
+// v2 scoring (primary)
+import { buildCompetitorProfileV2 } from './profileBuilderV2.js';
+// v1 scoring (kept available but unused for backward compatibility)
+import { buildCompetitorProfile } from './profileBuilder.js';
+import { SCORING_VERSION as SCORING_VERSION_V2 } from './scoringConfig.js';
 
 // Load .env from project root (one level above /backend)
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -14,7 +19,9 @@ const { parsed: env } = config({ path: resolve(__dirname, '../.env'), override: 
 
 const anthropic = new Anthropic({ apiKey: env?.ANTHROPIC_API_KEY ?? process.env.ANTHROPIC_API_KEY });
 
-const MODEL = 'claude-sonnet-4-6';
+const COMPETITOR_MODEL = 'claude-haiku-4-5-20251001';
+const ORCHESTRATOR_MODEL = 'claude-sonnet-4-6';
+const SCORING_VERSION = SCORING_VERSION_V2; // v2.0
 
 // ── Industry lookup (mirrors frontend INDUSTRY_OPTIONS) ───────────────────────
 
@@ -83,7 +90,7 @@ function hasShifted(r1, r2) {
 
 async function callCompetitorAgent(profile, messages, scenarioContext = {}) {
   const res = await anthropic.messages.create({
-    model: MODEL,
+    model: COMPETITOR_MODEL,
     max_tokens: 1000,
     system: buildCompetitorSystemPrompt(profile, scenarioContext),
     messages,
@@ -134,24 +141,52 @@ async function runRoundN(competitors, triggerMessage, triggerEvent, previousResu
  * Runs a full multi-round competitive simulation.
  *
  * @param {{
- *   yourCompany: { name: string, strategicMove: string, context: string, industry?: string, industryOther?: string, companyType?: string, marketGeography?: string, marketOverview?: string },
- *   competitors: object[]
+ *   yourCompany: { name: string, strategicMove: string, context: string, industry?: string, industryOther?: string, companyType?: string, marketGeography?: string, marketOverview?: string, ...otherFields },
+ *   competitors: object[] (raw competitor inputs, not profiles)
  * }} scenario
  */
 export async function runSimulation(scenario) {
-  const { yourCompany, competitors } = scenario;
-  const triggerMessage = buildTriggerMessage(yourCompany);
-  const triggerEvent = `${yourCompany.name} has announced: ${yourCompany.strategicMove}`;
+  const { yourCompany: yourCompanyInput, competitors: rawCompetitors } = scenario;
+
+  // ── Build v2 profiles ────────────────────────────────────────────────────────
+  // Prepare yourCompany with default values for scoring
+  const yourCompany = {
+    name: yourCompanyInput.name,
+    revenueGrowthRate: yourCompanyInput.revenueGrowthRate ?? 0,
+    ebitdaMargin: yourCompanyInput.ebitdaMargin ?? 15,
+    cashPosition: yourCompanyInput.cashPosition ?? 'moderate',
+    debtToEbitda: yourCompanyInput.debtToEbitda ?? 2,
+    operationalFlexibility: yourCompanyInput.operationalFlexibility ?? 'medium',
+    annualRevenue: yourCompanyInput.annualRevenue ?? null,
+    moveType: yourCompanyInput.moveType ?? 'price_cut',
+    moveVisibility: yourCompanyInput.moveVisibility ?? undefined,
+    industry: yourCompanyInput.industry,
+    industryOther: yourCompanyInput.industryOther,
+    companyType: yourCompanyInput.companyType,
+    marketGeography: yourCompanyInput.marketGeography,
+    marketOverview: yourCompanyInput.marketOverview,
+    strategicMove: yourCompanyInput.strategicMove,
+    context: yourCompanyInput.context,
+  };
+
+  // Build v2 competitor profiles, passing yourCompany for relative firepower
+  const competitors = rawCompetitors.map(raw => buildCompetitorProfileV2(raw, yourCompany));
+
+  // Also build a v2 profile for yourCompany (for relative firepower metrics)
+  const yourCompanyProfile = buildCompetitorProfileV2(yourCompany, yourCompany);
+
+  const triggerMessage = buildTriggerMessage(yourCompanyInput);
+  const triggerEvent = `${yourCompanyInput.name} has announced: ${yourCompanyInput.strategicMove}`;
 
   // ── Derive scenario context ──────────────────────────────────────────────────
-  const industryOption = INDUSTRY_OPTIONS.find(o => o.value === yourCompany.industry);
+  const industryOption = INDUSTRY_OPTIONS.find(o => o.value === yourCompanyInput.industry);
   const scenarioContext = {
-    industryLabel: industryOption?.label ?? yourCompany.industryOther ?? '',
-    industryOther: yourCompany.industryOther ?? '',
-    companyType: yourCompany.companyType ?? '',
-    companyTypeLabel: COMPETITOR_TYPE_LABELS[yourCompany.companyType] ?? '',
-    marketGeography: yourCompany.marketGeography ?? '',
-    marketOverview: yourCompany.marketOverview ?? '',
+    industryLabel: industryOption?.label ?? yourCompanyInput.industryOther ?? '',
+    industryOther: yourCompanyInput.industryOther ?? '',
+    companyType: yourCompanyInput.companyType ?? '',
+    companyTypeLabel: COMPETITOR_TYPE_LABELS[yourCompanyInput.companyType] ?? '',
+    marketGeography: yourCompanyInput.marketGeography ?? '',
+    marketOverview: yourCompanyInput.marketOverview ?? '',
   };
 
   // ── Round 1 ─────────────────────────────────────────────────────────────────
@@ -186,10 +221,15 @@ export async function runSimulation(scenario) {
     finalAlternativeResponse: r.response.alternativeResponse ?? {},
     confidenceScore: r.response.confidenceScore ?? 0,
     dataPointsDriving: r.response.dataPointsDriving ?? [],
+    // v2: relative firepower + predicted reaction profile, for orchestrator synthesis
+    responseCapacityScore: r.profile.responseCapacityScore,
+    relativeFirepowerRatio: r.profile.relativeFirepowerRatio,
+    relativeLabel: r.profile.relativeLabel,
+    predictedReactionProfile: r.profile.predictedReactionProfile,
   }));
 
   const orchRes = await anthropic.messages.create({
-    model: MODEL,
+    model: ORCHESTRATOR_MODEL,
     max_tokens: 4096,
     system:
       'You are a senior strategy consultant synthesizing a competitive simulation. ' +
@@ -197,7 +237,7 @@ export async function runSimulation(scenario) {
     messages: [
       {
         role: 'user',
-        content: buildOrchestratorPrompt(triggerEvent, allFinalResponses, yourCompany, scenarioContext),
+        content: buildOrchestratorPrompt(triggerEvent, allFinalResponses, yourCompanyInput, scenarioContext),
       },
     ],
   });
@@ -215,9 +255,11 @@ export async function runSimulation(scenario) {
     totalRounds: equilibriumReached ? 2 : 3,
     orchestratorOutput,
     competitorProfiles: competitors,
+    yourCompanyProfile,
     simulationMetadata: {
       timestamp: new Date().toISOString(),
-      yourCompany,
+      scoringVersion: SCORING_VERSION,
+      yourCompany: yourCompanyInput,
     },
   };
 }

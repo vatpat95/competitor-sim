@@ -1,3 +1,5 @@
+import { useState } from 'react'
+
 const COMPETITOR_TYPE_OPTIONS = [
   { value: 'low_cost_challenger', label: 'Low-cost Challenger' },
   { value: 'incumbent_leader',    label: 'Incumbent / Market Leader' },
@@ -7,70 +9,176 @@ const COMPETITOR_TYPE_OPTIONS = [
   { value: 'disruptor',           label: 'Disruptor / New Entrant' },
 ]
 
-// ── Score computation (mirrors backend profileBuilder.js) ────────────────────
+// ── v2 Score computation (mirrors backend profileBuilderV2.js + scoringConfig.js) ─
+// Keep this in sync with the backend — CLAUDE.md notes the live scorecard and the
+// API response must agree on these formulas.
 
-function computeScores(c) {
+const AGGRESSION_KEYWORDS = ['defend', 'aggressive', 'fight', 'match', "won't cede", 'price war', 'undercut', 'retaliate']
+const GROWTH_KEYWORDS = ['share', 'growth', 'volume', 'market', 'expand', 'acquisition']
+const MARGIN_KEYWORDS = ['margin', 'profit', 'profitability', 'return', 'yield', 'earnings']
+const NICHE_KEYWORDS = ['focus', 'segment', 'specific', 'rural', 'premium', 'boutique', 'specialized']
+const INNOVATION_KEYWORDS = ['innovate', 'innovation', 'premium', 'quality', 'experience', 'features', 'differentiate', 'technology']
+const NEGATION_WORDS = ['not', "won't", "doesn't", "don't", 'rather than', 'instead of', 'avoid']
+
+const PRICE_RELEVANCE_BY_MOVE_TYPE = {
+  price_cut: 1.0, price_increase: 1.0, bundle_promo: 1.0,
+  product_launch: 0.5, market_entry: 0.5, capacity_expansion: 0.5, other: 0.5,
+}
+const SHARE_DRIVE_MAP = { gaining: 70, stable: 35, losing: 55 }
+const OPS_BASE_MAP = { high: 80, medium: 50, low: 25 }
+const OPS_ADJ_BY_HEADCOUNT = { growing: 10, flat: 0, shrinking: -10 }
+const CONSTRAINTS_DAMPENER_MAP = { none: 1.0, moderate: 0.7, severe: 0.4 }
+const OWNERSHIP_INTENSITY_MOD_MAP = { public: 1.0, pe_backed: 0.85, family_private: 1.0, state_owned: 0.90 }
+const OWNERSHIP_SPEED_PENALTY = { public: false, pe_backed: false, family_private: false, state_owned: true }
+const MOVE_VISIBILITY_DEFAULTS = {
+  price_cut: 'high', price_increase: 'high', bundle_promo: 'high',
+  product_launch: 'high', market_entry: 'high', capacity_expansion: 'medium', other: 'medium',
+}
+const AWARENESS_SCORE_MAP = { high: 90, medium: 65, low: 40 }
+
+function clamp(lo, hi, v) { return Math.max(lo, Math.min(hi, v)) }
+function round1(v) { return Math.round(v * 10) / 10 }
+
+function scoreRhetoric(text) {
+  if (!text) return 0
+  const lower = text.toLowerCase()
+  const count = AGGRESSION_KEYWORDS.filter(kw => lower.includes(kw)).length
+  if (count >= 2) return 80
+  if (count === 1) return 40
+  return 0
+}
+
+function scoreIntentDimension(lower, keywords) {
+  let score = 0
+  for (const kw of keywords) {
+    const idx = lower.indexOf(kw.toLowerCase())
+    if (idx === -1) continue
+    const before = lower.substring(Math.max(0, idx - 50), idx)
+    const words = before.split(/\s+/).slice(-4)
+    const negated = NEGATION_WORDS.some(neg => words.some(w => w.includes(neg)))
+    if (!negated) score += 25
+  }
+  return clamp(0, 100, score)
+}
+
+function scoreStrategicIntent(ceoPriorityStatement, recentNewsSignals) {
+  const text = `${ceoPriorityStatement || ''} ${(recentNewsSignals || []).join(' ')}`
+  const lower = text.toLowerCase()
+  return {
+    growthMaximizer: scoreIntentDimension(lower, GROWTH_KEYWORDS),
+    marginDefender: scoreIntentDimension(lower, MARGIN_KEYWORDS),
+    nichePlayer: scoreIntentDimension(lower, NICHE_KEYWORDS),
+    innovationBetter: scoreIntentDimension(lower, INNOVATION_KEYWORDS),
+  }
+}
+
+function calcResponseCapacity(c) {
   const cashScoreMap = { strong: 100, moderate: 50, weak: 10 }
   const cashScore = cashScoreMap[c.cashPosition] ?? 50
-  const debtScore = Math.max(0, 100 - (c.debtToEbitda || 0) * 15)
-  const marginScore = Math.min(100, (c.ebitdaMargin || 0) * 3)
-  const financialCapacityScore =
-    Math.round((cashScore * 0.4 + debtScore * 0.35 + marginScore * 0.25) * 10) / 10
+  const debtScore = clamp(0, 100, 100 - (c.debtToEbitda || 0) * 15)
+  const marginScore = clamp(0, 100, (c.ebitdaMargin || 0) * 3)
+  const financialFirepower = cashScore * 0.40 + debtScore * 0.35 + marginScore * 0.25
 
-  const moves = c.lastThreePriceMoves || []
-  const downMoves = moves.filter(m => m.direction === 'down')
-  const priceMovementScore =
-    downMoves.length > 0
-      ? (downMoves.reduce((s, m) => s + (m.magnitude || 0), 0) / downMoves.length) * 4
-      : 0
-  const shareScoreMap = { gaining: 80, stable: 40, losing: 20 }
-  const shareScore = shareScoreMap[c.marketShareTrend] ?? 40
-  const capacityBonus = financialCapacityScore * 0.3
-  const aggressionIndex = Math.min(
-    100,
-    Math.round((priceMovementScore * 0.4 + shareScore * 0.3 + capacityBonus * 0.3) * 10) / 10
-  )
+  const annualRevenue = c.annualRevenue
+  const scale = (annualRevenue === null || annualRevenue === undefined || annualRevenue === 0)
+    ? 50
+    : clamp(0, 100, ((Math.log10(annualRevenue) - 1) / 4) * 100)
 
-  const ceo = (c.ceoPriorityStatement || '').toLowerCase()
-  const holdCount = moves.filter(m => m.direction === 'hold').length
-  const growth = c.revenueGrowthRate || 0
-  const margin = c.ebitdaMargin || 0
-  const rd = c.rdSpendPct || 0
+  const opsBase = OPS_BASE_MAP[c.operationalFlexibility] ?? OPS_BASE_MAP.medium
+  const opsAdj = OPS_ADJ_BY_HEADCOUNT[c.headcountTrend] ?? 0
+  const operationalFlex = clamp(0, 100, opsBase + opsAdj)
 
-  const rawGrowth =
-    (growth > 10 ? 3 : growth > 5 ? 2 : 1) +
-    (c.marketShareTrend === 'gaining' ? 2 : 0) +
-    (ceo.includes('share') ? 1 : 0) +
-    (ceo.includes('growth') ? 1 : 0)
+  return round1(financialFirepower * 0.50 + scale * 0.30 + operationalFlex * 0.20)
+}
 
-  const rawMargin =
-    (margin > 25 ? 3 : margin > 15 ? 2 : 1) +
-    holdCount +
-    (ceo.includes('margin') ? 1 : 0) +
-    (ceo.includes('profit') ? 1 : 0)
+function calcMotivation(c, moveType) {
+  const exposureToMove = c.exposureToMove ?? 50
+  const marketOverlapPct = c.marketOverlapPct ?? 70
+  const stakesScore = exposureToMove * 0.60 + marketOverlapPct * 0.40
 
-  const rawNiche =
-    (c.marketShareTrend === 'losing' ? 2 : 1) +
-    (ceo.includes('focus') ? 1 : 0) +
-    (ceo.includes('rural') ? 2 : 0) +
-    (ceo.includes('specific') ? 1 : 0) +
-    (financialCapacityScore < 40 ? 2 : 0)
+  const moves = (c.lastThreePriceMoves || []).filter(m => m.direction !== 'hold')
+  const rawPriceReactivity = moves.length > 0
+    ? clamp(0, 100, (moves.reduce((s, m) => s + (m.magnitude || 0), 0) / moves.length) * 4)
+    : 0
+  const priceRelevance = PRICE_RELEVANCE_BY_MOVE_TYPE[moveType] ?? 0.5
+  const priceReactivity = rawPriceReactivity * priceRelevance
 
-  const rawInnovation =
-    (rd > 8 ? 3 : rd > 4 ? 2 : 1) +
-    (ceo.includes('innovat') ? 2 : 0) +
-    (ceo.includes('premium') ? 1 : 0) +
-    (ceo.includes('experience') ? 1 : 0)
+  const shareDrive = SHARE_DRIVE_MAP[c.marketShareTrend] ?? SHARE_DRIVE_MAP.stable
+  const rhetoric = scoreRhetoric(`${c.ceoPriorityStatement || ''} ${(c.recentNewsSignals || []).join(' ')}`)
 
-  const total = rawGrowth + rawMargin + rawNiche + rawInnovation
+  const disposition = priceReactivity * 0.45 + shareDrive * 0.30 + rhetoric * 0.25
+  const motivationScore = stakesScore * 0.60 + disposition * 0.40
+
+  return { stakesScore: round1(stakesScore), disposition: round1(disposition), motivationScore: round1(motivationScore) }
+}
+
+function calcAwareness(moveType, moveVisibility) {
+  const effectiveVisibility = moveVisibility || (MOVE_VISIBILITY_DEFAULTS[moveType] ?? 'high')
+  return AWARENESS_SCORE_MAP[effectiveVisibility] ?? AWARENESS_SCORE_MAP.medium
+}
+
+/**
+ * Computes the full v2 score set for the live scorecard, mirroring
+ * backend/profileBuilderV2.js. yourCompany is optional — if absent,
+ * relative firepower defaults to "evenly matched".
+ */
+function computeScores(c, yourCompany = {}) {
+  const moveType = yourCompany?.moveType || 'price_cut'
+
+  const responseCapacityScore = calcResponseCapacity(c)
+  const yourCapacityScore = yourCompany?.name ? calcResponseCapacity(yourCompany) : 50
+  const relativeFirepowerRatio = round1(responseCapacityScore / Math.max(yourCapacityScore, 1))
+  const relativeLabel =
+    relativeFirepowerRatio >= 1.25 ? 'stronger than you'
+    : relativeFirepowerRatio <= 0.80 ? 'weaker than you'
+    : 'evenly matched'
+
+  const { stakesScore, disposition, motivationScore } = calcMotivation(c, moveType)
+  const awarenessScore = calcAwareness(moveType, yourCompany?.moveVisibility)
+  const awarenessFactor = awarenessScore / 100
+
+  const constraintsDampener = CONSTRAINTS_DAMPENER_MAP[c.responseConstraintLevel] ?? 1.0
+  const ownershipIntensityMod = OWNERSHIP_INTENSITY_MOD_MAP[c.ownershipType] ?? 1.0
+  const ownershipSpeedPenalty = OWNERSHIP_SPEED_PENALTY[c.ownershipType] ?? false
+
+  const intent = scoreStrategicIntent(c.ceoPriorityStatement, c.recentNewsSignals)
+
+  let responseLikelihood = round1(motivationScore * awarenessFactor)
+  if (responseCapacityScore < 25) responseLikelihood = Math.min(responseLikelihood, 50)
+
+  const responseIntensity = round1(Math.min(motivationScore, responseCapacityScore) * constraintsDampener * ownershipIntensityMod)
+
+  let responseSpeed = 'moderate'
+  if (disposition > 60 && responseCapacityScore > 50 && !ownershipSpeedPenalty) responseSpeed = 'fast'
+  else if (responseCapacityScore < 35 || ownershipSpeedPenalty || c.switchingFriction === 'high') responseSpeed = 'slow'
+
+  const exposureToMove = c.exposureToMove ?? 50
+  const vectors = []
+  if (exposureToMove < 30) {
+    vectors.push('Ignore / monitor only')
+  } else {
+    if (c.responseConstraintLevel === 'severe') vectors.push('Constrained — limited or non-price response')
+    const priceMoveTypes = ['price_cut', 'price_increase', 'bundle_promo']
+    if (intent.marginDefender > intent.growthMaximizer && priceMoveTypes.includes(moveType)) vectors.push('Hold price, defend on value / non-price levers')
+    if (intent.growthMaximizer > 40 && responseCapacityScore > 55 && priceMoveTypes.includes(moveType)) vectors.push('Match or undercut on price')
+    if (intent.innovationBetter > intent.growthMaximizer && intent.innovationBetter > intent.marginDefender) vectors.push('Differentiate via product / features')
+    if (c.regulatoryConstraints && moveType === 'price_cut') vectors.push('Possible legal / regulatory response')
+  }
+  if (vectors.length === 0) vectors.push('Measured competitive response')
+
   return {
-    financialCapacityScore,
-    aggressionIndex,
-    intent: {
-      growthMaximizer: Math.round((rawGrowth / total) * 1000) / 1000,
-      marginDefender: Math.round((rawMargin / total) * 1000) / 1000,
-      nichePlayer: Math.round((rawNiche / total) * 1000) / 1000,
-      innovationBetter: Math.round((rawInnovation / total) * 1000) / 1000,
+    responseCapacityScore,
+    relativeFirepowerRatio,
+    relativeLabel,
+    motivationScore,
+    stakesScore,
+    awarenessScore,
+    intent,
+    predictedReactionProfile: {
+      responseLikelihood,
+      responseSpeed,
+      responseIntensity,
+      likelyResponseVectors: vectors,
     },
   }
 }
@@ -140,10 +248,16 @@ function capTier(v) {
   return { label: 'Low', sub: 'Constrained — likely limited to defensive or low-cost responses only', color: 'text-red-600', bar: 'bg-red-500' }
 }
 
-function aggTier(v) {
-  if (v >= 70) return { label: 'Highly aggressive', sub: 'Expect fast, large-magnitude responses to any competitive trigger', color: 'text-red-600', bar: 'bg-red-500' }
-  if (v >= 45) return { label: 'Selectively aggressive', sub: 'Will respond to direct threats but avoids broad price wars', color: 'text-amber-600', bar: 'bg-amber-500' }
-  return { label: 'Low aggression', sub: 'Tends to hold position or respond gradually — unlikely to escalate', color: 'text-blue-600', bar: 'bg-blue-400' }
+function motivationTier(v) {
+  if (v >= 65) return { label: 'Highly motivated', sub: 'This move threatens what matters to them — expect a forceful response', color: 'text-red-600', bar: 'bg-red-500' }
+  if (v >= 40) return { label: 'Moderately motivated', sub: 'Worth watching — may warrant a measured response', color: 'text-amber-600', bar: 'bg-amber-500' }
+  return { label: 'Low motivation', sub: 'Not a priority threat — likely to hold position', color: 'text-blue-600', bar: 'bg-blue-400' }
+}
+
+function speedTier(speed) {
+  if (speed === 'fast') return { label: 'Fast', color: 'text-red-600' }
+  if (speed === 'slow') return { label: 'Slow', color: 'text-blue-600' }
+  return { label: 'Moderate', color: 'text-amber-600' }
 }
 
 const INTENT_META = {
@@ -169,13 +283,18 @@ function ScoreBar({ value, colorClass = 'bg-blue-500', showPct = false }) {
 // ── Live score card ───────────────────────────────────────────────────────────
 
 function LiveScoreCard({ scores }) {
-  const { financialCapacityScore, aggressionIndex, intent } = scores
-  const cap = capTier(financialCapacityScore)
-  const agg = aggTier(aggressionIndex)
+  const {
+    responseCapacityScore, relativeFirepowerRatio, relativeLabel,
+    motivationScore, intent, predictedReactionProfile,
+  } = scores
+  const cap = capTier(responseCapacityScore)
+  const mot = motivationTier(motivationScore)
+  const spd = speedTier(predictedReactionProfile.responseSpeed)
 
-  // Find dominant intent
+  // Find dominant intent — note: v2 intent dimensions are independent 0–100, not normalized to 100%
   const topIntent = Object.entries(intent).sort(([,a],[,b]) => b - a)[0]
   const topMeta = INTENT_META[topIntent?.[0]] ?? {}
+  const intentMax = Math.max(...Object.values(intent), 1)
 
   return (
     <div className="sticky top-6 rounded-xl overflow-hidden" style={{ background: '#0f172a', border: '1px solid #1e3a5f' }}>
@@ -183,13 +302,19 @@ function LiveScoreCard({ scores }) {
         <h3 className="text-xs font-bold uppercase tracking-widest" style={{ color: '#4a7fa5' }}>Live Scoring</h3>
       </div>
 
-      {/* Financial Capacity */}
+      {/* Relative firepower */}
+      <div className="px-4 py-2.5" style={{ borderBottom: '1px solid #1e3a5f', background: '#0b1220' }}>
+        <span className="text-xs font-medium text-gray-500">Relative to your company</span>
+        <p className="text-sm font-semibold text-gray-200 mt-0.5">{relativeLabel} <span className="text-xs text-gray-500 font-normal">({relativeFirepowerRatio.toFixed(2)}×)</span></p>
+      </div>
+
+      {/* Response Capacity */}
       <div className="px-4 py-3" style={{ borderBottom: '1px solid #1e3a5f' }}>
         <div className="flex items-baseline justify-between mb-1">
-          <span className="text-xs font-medium text-gray-500">Financial firepower</span>
-          <span className="text-xs font-bold text-gray-300">{financialCapacityScore.toFixed(0)}/100</span>
+          <span className="text-xs font-medium text-gray-500">Response capacity</span>
+          <span className="text-xs font-bold text-gray-300">{responseCapacityScore.toFixed(0)}/100</span>
         </div>
-        <ScoreBar value={financialCapacityScore} colorClass={cap.bar} />
+        <ScoreBar value={responseCapacityScore} colorClass={cap.bar} />
         <div className="mt-1.5">
           <span className={`text-xs font-semibold ${cap.color}`}>{cap.label}</span>
           <p className="text-xs text-gray-500 leading-snug mt-0.5">{cap.sub}</p>
@@ -200,20 +325,45 @@ function LiveScoreCard({ scores }) {
         </div>
       </div>
 
-      {/* Aggression Index */}
+      {/* Motivation */}
       <div className="px-4 py-3" style={{ borderBottom: '1px solid #1e3a5f' }}>
         <div className="flex items-baseline justify-between mb-1">
-          <span className="text-xs font-medium text-gray-500">Likely to fight back?</span>
-          <span className="text-xs font-bold text-gray-300">{aggressionIndex.toFixed(0)}/100</span>
+          <span className="text-xs font-medium text-gray-500">Motivated to respond?</span>
+          <span className="text-xs font-bold text-gray-300">{motivationScore.toFixed(0)}/100</span>
         </div>
-        <ScoreBar value={aggressionIndex} colorClass={agg.bar} />
+        <ScoreBar value={motivationScore} colorClass={mot.bar} />
         <div className="mt-1.5">
-          <span className={`text-xs font-semibold ${agg.color}`}>{agg.label}</span>
-          <p className="text-xs text-gray-500 leading-snug mt-0.5">{agg.sub}</p>
+          <span className={`text-xs font-semibold ${mot.color}`}>{mot.label}</span>
+          <p className="text-xs text-gray-500 leading-snug mt-0.5">{mot.sub}</p>
         </div>
         <div className="flex justify-between text-[10px] text-gray-600 mt-1.5">
-          <span>0 — Passive</span>
-          <span>100 — Very aggressive</span>
+          <span>0 — Indifferent</span>
+          <span>100 — Highly threatened</span>
+        </div>
+      </div>
+
+      {/* Predicted Reaction Profile */}
+      <div className="px-4 py-3" style={{ borderBottom: '1px solid #1e3a5f' }}>
+        <p className="text-xs font-medium text-gray-500 mb-2">Predicted reaction</p>
+        <div className="grid grid-cols-3 gap-2 mb-2">
+          <div>
+            <p className="text-[10px] text-gray-600">Likelihood</p>
+            <p className="text-sm font-bold text-gray-200">{predictedReactionProfile.responseLikelihood.toFixed(0)}%</p>
+          </div>
+          <div>
+            <p className="text-[10px] text-gray-600">Speed</p>
+            <p className={`text-sm font-bold ${spd.color}`}>{spd.label}</p>
+          </div>
+          <div>
+            <p className="text-[10px] text-gray-600">Intensity</p>
+            <p className="text-sm font-bold text-gray-200">{predictedReactionProfile.responseIntensity.toFixed(0)}</p>
+          </div>
+        </div>
+        <p className="text-[10px] text-gray-600 mb-1">Most likely approach</p>
+        <div className="flex flex-col gap-1">
+          {predictedReactionProfile.likelyResponseVectors.map((v, i) => (
+            <span key={i} className="text-xs text-gray-300 px-2 py-1 rounded" style={{ background: '#111827' }}>{v}</span>
+          ))}
         </div>
       </div>
 
@@ -224,7 +374,6 @@ function LiveScoreCard({ scores }) {
           .sort(([,a],[,b]) => b - a)
           .map(([key, val]) => {
             const meta = INTENT_META[key]
-            const pct = (val * 100).toFixed(0)
             const isTop = key === topIntent?.[0]
             return (
               <div key={key} className="mb-2.5">
@@ -232,9 +381,9 @@ function LiveScoreCard({ scores }) {
                   <span className={`text-xs ${isTop ? 'font-semibold text-gray-200' : 'text-gray-500'}`}>
                     {meta.label}
                   </span>
-                  <span className={`text-xs font-bold ${isTop ? 'text-gray-100' : 'text-gray-600'}`}>{pct}%</span>
+                  <span className={`text-xs font-bold ${isTop ? 'text-gray-100' : 'text-gray-600'}`}>{val.toFixed(0)}/100</span>
                 </div>
-                <ScoreBar value={val} colorClass={meta.color} showPct />
+                <ScoreBar value={val} colorClass={meta.color} />
                 {isTop && (
                   <p className="text-[10px] text-gray-500 mt-0.5 leading-snug">{meta.desc}</p>
                 )}
@@ -242,7 +391,7 @@ function LiveScoreCard({ scores }) {
             )
           })}
         <p className="text-[10px] text-gray-600 mt-2 leading-snug">
-          Dominant strategy shapes how the AI models this competitor's decisions.
+          Each dimension is scored independently — a competitor can be high on more than one.
         </p>
       </div>
     </div>
@@ -251,7 +400,7 @@ function LiveScoreCard({ scores }) {
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-export default function CompetitorProfileForm({ competitor, onChange, index }) {
+export default function CompetitorProfileForm({ competitor, onChange, index, yourCompany }) {
   function update(key, value) {
     onChange(index, { ...competitor, [key]: value })
   }
@@ -291,7 +440,7 @@ export default function CompetitorProfileForm({ competitor, onChange, index }) {
     update('recentNewsSignals', (competitor.recentNewsSignals || []).filter((_, idx) => idx !== i))
   }
 
-  const scores = computeScores(competitor)
+  const scores = computeScores(competitor, yourCompany)
   const moves = competitor.lastThreePriceMoves || []
   const signals = competitor.recentNewsSignals || []
 
@@ -505,12 +654,139 @@ export default function CompetitorProfileForm({ competitor, onChange, index }) {
             className={`${sharedInputCls} resize-none`}
           />
         </FieldRow>
+
+        {/* v2 — Advanced / optional fields, collapsed by default to keep the form simple */}
+        <AdvancedSection competitor={competitor} update={update} />
       </div>
 
       {/* ── Live score card ── */}
       <div className="w-56 shrink-0">
         <LiveScoreCard scores={scores} />
       </div>
+    </div>
+  )
+}
+
+// ── v2 Advanced / optional section ────────────────────────────────────────────
+
+function SliderField({ label, value, onChange, hint }) {
+  return (
+    <div className="mb-3">
+      <div className="flex items-baseline justify-between mb-1">
+        <label className="text-sm font-medium text-gray-300">{label}</label>
+        <span className="text-xs font-semibold text-gray-400">{value}%</span>
+      </div>
+      <input
+        type="range"
+        min={0}
+        max={100}
+        value={value}
+        onChange={e => onChange(Number(e.target.value))}
+        className="w-full h-1.5 rounded-full appearance-none cursor-pointer accent-sky-500"
+      />
+      {hint && <p className="text-xs text-gray-600 mt-1">{hint}</p>}
+    </div>
+  )
+}
+
+function AdvancedSection({ competitor, update }) {
+  const [open, setOpen] = useState(false)
+
+  return (
+    <div className="mt-5 rounded-lg overflow-hidden" style={{ border: '1px solid #1f2937' }}>
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        className="w-full flex items-center justify-between px-4 py-3 text-sm font-medium text-gray-400 hover:text-gray-200 transition-colors"
+        style={{ background: '#0d1117' }}
+      >
+        <span>Advanced / optional <span className="text-xs text-gray-600 font-normal ml-2">Sharpens the prediction — not required to run</span></span>
+        <span className="text-gray-600">{open ? '▲' : '▼'}</span>
+      </button>
+
+      {open && (
+        <div className="px-4 py-4" style={{ background: '#111827', borderTop: '1px solid #1f2937' }}>
+          <FieldRow label="Exposure to this move">
+            <SliderField
+              label=""
+              value={competitor.exposureToMove ?? 50}
+              onChange={v => update('exposureToMove', v)}
+              hint="% of their revenue this move actually threatens. The single biggest driver of whether they respond."
+            />
+          </FieldRow>
+
+          <FieldRow label="Market overlap">
+            <SliderField
+              label=""
+              value={competitor.marketOverlapPct ?? 70}
+              onChange={v => update('marketOverlapPct', v)}
+              hint="How much they compete in your markets/segments."
+            />
+          </FieldRow>
+
+          <div className="grid grid-cols-2 gap-3">
+            <FieldRow label="Annual revenue ($M)">
+              <input
+                type="number"
+                value={competitor.annualRevenue ?? ''}
+                onChange={e => update('annualRevenue', e.target.value === '' ? null : parseFloat(e.target.value))}
+                placeholder="Unknown"
+                step="1"
+                className={sharedInputCls}
+              />
+            </FieldRow>
+            <FieldRow label="Ownership type">
+              <select
+                value={competitor.ownershipType || 'public'}
+                onChange={e => update('ownershipType', e.target.value)}
+                className={sharedInputCls + ' cursor-pointer'}
+                style={{ background: '#0d1117', border: '1px solid #374151' }}
+              >
+                <option value="public">Public</option>
+                <option value="pe_backed">PE-backed</option>
+                <option value="family_private">Family / private</option>
+                <option value="state_owned">State-owned</option>
+              </select>
+            </FieldRow>
+          </div>
+
+          <FieldRow label="Operational flexibility">
+            <ToggleGroup
+              value={competitor.operationalFlexibility || 'medium'}
+              onChange={v => update('operationalFlexibility', v)}
+              options={[
+                { value: 'high',   label: 'High',   activeClass: 'bg-emerald-900 text-emerald-300 font-semibold' },
+                { value: 'medium', label: 'Medium', activeClass: 'bg-sky-900 text-sky-300 font-semibold' },
+                { value: 'low',    label: 'Low',     activeClass: 'bg-red-900 text-red-300 font-semibold' },
+              ]}
+            />
+          </FieldRow>
+
+          <FieldRow label="Customer switching friction">
+            <ToggleGroup
+              value={competitor.switchingFriction || 'medium'}
+              onChange={v => update('switchingFriction', v)}
+              options={[
+                { value: 'low',    label: 'Low',    activeClass: 'bg-red-900 text-red-300 font-semibold' },
+                { value: 'medium', label: 'Medium', activeClass: 'bg-sky-900 text-sky-300 font-semibold' },
+                { value: 'high',   label: 'High',   activeClass: 'bg-emerald-900 text-emerald-300 font-semibold' },
+              ]}
+            />
+          </FieldRow>
+
+          <FieldRow label="Response constraint level">
+            <ToggleGroup
+              value={competitor.responseConstraintLevel || 'none'}
+              onChange={v => update('responseConstraintLevel', v)}
+              options={[
+                { value: 'none',     label: 'None',     activeClass: 'bg-emerald-900 text-emerald-300 font-semibold' },
+                { value: 'moderate', label: 'Moderate', activeClass: 'bg-amber-900 text-amber-300 font-semibold' },
+                { value: 'severe',   label: 'Severe',   activeClass: 'bg-red-900 text-red-300 font-semibold' },
+              ]}
+            />
+          </FieldRow>
+        </div>
+      )}
     </div>
   )
 }

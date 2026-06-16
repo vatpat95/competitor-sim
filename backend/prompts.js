@@ -21,9 +21,10 @@ const COMPETITOR_TYPE_LABELS = {
 };
 
 /**
- * Builds the system prompt for a competitor agent, embedding the full scored profile.
+ * Builds the system prompt for a competitor agent, embedding the full v2 scored profile
+ * (Awareness / Motivation / Capability + Predicted Reaction Profile + relative firepower).
  *
- * @param {object} profile - Output of buildCompetitorProfile()
+ * @param {object} profile - Output of buildCompetitorProfileV2()
  * @param {{ industryLabel?: string, companyType?: string, companyTypeLabel?: string, marketGeography?: string, marketOverview?: string }} scenarioContext
  * @returns {string}
  */
@@ -34,9 +35,14 @@ export function buildCompetitorSystemPrompt(profile, scenarioContext = {}) {
     revenueGrowthRate,
     cashPosition,
     debtToEbitda,
-    financialCapacityScore,
-    aggressionIndex,
+    responseCapacityScore,
+    motivationScore,
+    awarenessScore,
+    relativeFirepowerRatio,
+    relativeLabel,
     strategicIntentVector,
+    predictedReactionProfile,
+    stakesSummary,
     reactionPatternSummary,
     constraintSummary,
     signalSummary,
@@ -53,20 +59,27 @@ export function buildCompetitorSystemPrompt(profile, scenarioContext = {}) {
   } = scenarioContext;
 
   const capacityInterpretation =
-    financialCapacityScore >= 70
+    responseCapacityScore >= 70
       ? 'high — can sustain aggressive or prolonged competitive moves'
-      : financialCapacityScore >= 40
+      : responseCapacityScore >= 40
       ? 'moderate — selective responses only; cannot sustain prolonged price wars'
       : 'low — constrained to defensive or low-cost responses only';
 
-  const aggressionInterpretation =
-    aggressionIndex >= 70
-      ? 'highly aggressive — expect fast, large-magnitude responses'
-      : aggressionIndex >= 45
-      ? 'moderately aggressive — will respond selectively to direct threats'
-      : 'low aggression — prefers to hold position or respond gradually';
+  const motivationInterpretation =
+    motivationScore >= 65
+      ? 'high — this move directly threatens what matters to you, you are inclined to respond forcefully'
+      : motivationScore >= 40
+      ? 'moderate — this move is worth watching and may warrant a measured response'
+      : 'low — this move is not a priority threat; you would rather hold position';
 
-  // Sort strategic intent dimensions highest to lowest, rendered as percentages
+  const awarenessInterpretation =
+    awarenessScore >= 80
+      ? 'very visible — you will notice and attribute this move immediately'
+      : awarenessScore >= 55
+      ? 'moderately visible — you will likely notice this within normal market monitoring'
+      : 'low visibility — you may not notice or attribute this move quickly';
+
+  // Strategic Intent Vector v2: four independent 0-100 scores (not normalized to 100%)
   const intentLabels = {
     growthMaximizer: 'Growth Maximizer (prioritizes volume and share above margin)',
     marginDefender: 'Margin Defender (protects profitability; resists price erosion)',
@@ -76,10 +89,7 @@ export function buildCompetitorSystemPrompt(profile, scenarioContext = {}) {
 
   const sortedIntent = Object.entries(strategicIntentVector)
     .sort(([, a], [, b]) => b - a)
-    .map(([dimension, score]) => {
-      const pct = (score * 100).toFixed(1);
-      return `  - ${intentLabels[dimension] ?? dimension}: ${pct}%`;
-    })
+    .map(([dimension, score]) => `  - ${intentLabels[dimension] ?? dimension}: ${score}/100`)
     .join('\n');
 
   const myTypeLabel = COMPETITOR_TYPE_LABELS[competitorType] ?? '';
@@ -96,6 +106,19 @@ export function buildCompetitorSystemPrompt(profile, scenarioContext = {}) {
     ? `INDUSTRY CONTEXT:\n${contextLines.join('\n')}\n\n`
     : '';
 
+  const relativeFirepowerLine = relativeLabel
+    ? `RELATIVE POSITION: You are ${relativeLabel} the company making this move (your response capacity: ${responseCapacityScore}/100 vs. theirs — ratio ${relativeFirepowerRatio}).`
+    : '';
+
+  const reactionProfileLines = predictedReactionProfile
+    ? `PREDICTED REACTION PROFILE (your most likely posture toward this specific move):
+- Likelihood you respond at all: ${predictedReactionProfile.responseLikelihood}%
+- Likely speed: ${predictedReactionProfile.responseSpeed}
+- Likely intensity: ${predictedReactionProfile.responseIntensity}/100
+- Most plausible approaches: ${predictedReactionProfile.likelyResponseVectors.join('; ')}
+(This is a planning signal, not a script — use your judgment, but your actual response should be broadly consistent with this profile unless your constraints or strategic priorities argue otherwise.)`
+    : '';
+
   return `You are the Chief Strategy Officer of ${name}. You make competitive decisions based on your company's actual data and constraints.
 
 ---
@@ -104,14 +127,20 @@ ${industryContextBlock}COMPANY FINANCIALS:
 - Cash Position: ${cashPosition} | Debt-to-EBITDA: ${debtToEbitda}x
 
 COMPETITIVE SCORES:
-- Financial Capacity Score: ${financialCapacityScore}/100 → ${capacityInterpretation}
-- Aggression Index: ${aggressionIndex}/100 → ${aggressionInterpretation}
+- Response Capacity Score: ${responseCapacityScore}/100 → ${capacityInterpretation}
+- Motivation to Respond: ${motivationScore}/100 → ${motivationInterpretation}
+- Awareness: ${awarenessScore}/100 → ${awarenessInterpretation}
+${relativeFirepowerLine}
 
-STRATEGIC INTENT (ranked by dominance — these weights define how you make decisions):
+STRATEGIC INTENT (each dimension scored independently — you can be high on more than one):
 ${sortedIntent}
 
 CEO STRATEGIC PRIORITY: "${ceoPriorityStatement}"
 (This is the verbatim stated priority of your leadership. Your response must be consistent with this mandate.)
+
+WHY THIS MOVE MATTERS TO YOU: ${stakesSummary}
+
+${reactionProfileLines}
 
 REACTION PATTERN: ${reactionPatternSummary}
 CONSTRAINTS: ${constraintSummary}
@@ -119,14 +148,16 @@ RECENT INTELLIGENCE: ${signalSummary}
 ---
 
 When responding to a competitive trigger, you MUST:
-1. Ground your response in your financial capacity — you cannot spend or cut beyond what your capacity score allows
-2. Act consistently with your strategic priorities — a margin defender does not suddenly become a price warrior
-3. Consider your constraints — they are real limits, not suggestions
-4. Reference specific real numbers (margins, growth rates, debt levels) when explaining your decision
+1. Ground your response in your response capacity — you cannot spend or cut beyond what your capacity allows
+2. Weigh how much this specific move actually threatens you (your stakes/exposure) — do not react as hard to a move that barely touches your business as to one that hits your core
+3. Act consistently with your strategic priorities — a margin defender does not suddenly become a price warrior
+4. Consider your constraints — they are real limits, not suggestions
+5. Reference specific real numbers (margins, growth rates, debt levels) when explaining your decision
 
 LANGUAGE RULES — these are strict:
 - Write rationale as a business executive speaking to their board, not as an analyst citing a model
-- Never use scoring jargon: no "intent vector", "aggression index", "capacity score", "strategic weight", "Growth Maximizer", "Margin Defender"
+- Never use scoring jargon: no "intent vector", "aggression index", "capacity score", "response capacity score", "motivation score", "awareness score", "strategic weight", "stakes score", "Growth Maximizer", "Margin Defender", "predicted reaction profile", "relative firepower"
+- If you reference being more or less exposed than a rival, say it in plain business terms (e.g. "this move barely touches our core business" or "this hits nearly half our revenue base") — never cite the underlying percentage label as a score
 - ALWAYS include the actual numbers — but embed them in plain English sentences
   - Good: "We grew revenue 18.5% last year, so protecting that momentum matters more than margin right now"
   - Bad: "Growth Maximizer intent at 55.6% dominates our response calculus"
@@ -215,16 +246,34 @@ export function buildOrchestratorPrompt(triggerEvent, allFinalResponses, yourCom
     : '';
 
   const competitorSummaries = allFinalResponses
-    .map(({ competitorName, competitorType, finalPrimaryResponse, finalAlternativeResponse, confidenceScore, dataPointsDriving }) => {
+    .map(({
+      competitorName,
+      competitorType,
+      finalPrimaryResponse,
+      finalAlternativeResponse,
+      confidenceScore,
+      dataPointsDriving,
+      responseCapacityScore,
+      relativeLabel,
+      predictedReactionProfile,
+    }) => {
       const typeLabel = COMPETITOR_TYPE_LABELS[competitorType] ?? '';
+      const relativeLine = relativeLabel
+        ? `    Relative strength vs. your company: ${relativeLabel} (their response capacity: ${responseCapacityScore}/100)`
+        : '';
+      const reactionLine = predictedReactionProfile
+        ? `    Predicted reaction profile: ${predictedReactionProfile.responseLikelihood}% likely to respond, ${predictedReactionProfile.responseSpeed} speed, intensity ${predictedReactionProfile.responseIntensity}/100`
+        : '';
       return [
         `  ${competitorName}:${typeLabel ? ` [${typeLabel}]` : ''}`,
+        relativeLine,
+        reactionLine,
         `    Primary: ${finalPrimaryResponse.type} | magnitude ${finalPrimaryResponse.magnitude} | ${finalPrimaryResponse.timing}`,
         `    Rationale: ${finalPrimaryResponse.rationale}`,
         `    Alternative: ${finalAlternativeResponse.type} | magnitude ${finalAlternativeResponse.magnitude} | ${finalAlternativeResponse.timing}`,
         `    Confidence: ${confidenceScore}/100`,
         `    Key data points: ${dataPointsDriving.join(' | ')}`,
-      ].join('\n');
+      ].filter(Boolean).join('\n');
     })
     .join('\n\n');
 
@@ -240,7 +289,8 @@ Your audience is a senior executive or board member who has 60 seconds to read t
 
 STRICT LANGUAGE RULES:
 - Write for a senior executive who has 60 seconds and wants to know what to do and why
-- No scoring jargon: no "strategic intent vector", "capacity score", "ARPU compression", "Growth Maximizer"
+- No scoring jargon: no "strategic intent vector", "capacity score", "response capacity score", "predicted reaction profile", "relative firepower", "ARPU compression", "Growth Maximizer"
+- When describing relative strength, translate it into plain business terms (e.g. "they have less than a third of your scale" or "they are financially outmatched") — never cite an internal ratio or label directly
 - ALWAYS include actual numbers — they are what makes the analysis credible and trustworthy
   - Good: "ValueNet grew 18.5% last year and just hired 400 sales reps — they will move fast"
   - Bad: "Given ValueNet's high growth trajectory and capacity investment..." (vague, no numbers)
