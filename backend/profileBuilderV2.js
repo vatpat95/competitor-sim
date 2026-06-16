@@ -364,6 +364,9 @@ export function buildCompetitorProfileV2(rawInputs, yourCompany) {
     recentNewsSignals,
     regulatoryConstraints,
     competitorType,
+    // pass-through only — used when this function scores yourCompany (for buildOrchestratorPrompt)
+    strategicMove,
+    context,
     // v2 new fields (all optional with defaults)
     annualRevenue = null,
     ownershipType = 'public',
@@ -507,6 +510,9 @@ export function buildCompetitorProfileV2(rawInputs, yourCompany) {
     geographicFocus: geographicFocus || '',
     competitorType: competitorType || '',
     ceoPriorityStatement: ceoPriorityStatement || '',
+    // pass-through only — populated when this profile represents yourCompany
+    strategicMove,
+    context,
     // v2: New fields passed through
     annualRevenue,
     ownershipType,

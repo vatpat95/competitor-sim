@@ -56,6 +56,7 @@ export function buildCompetitorSystemPrompt(profile, scenarioContext = {}) {
     companyTypeLabel = '',
     marketGeography = '',
     marketOverview = '',
+    yourCompanyProfile = null,
   } = scenarioContext;
 
   const capacityInterpretation =
@@ -119,10 +120,21 @@ export function buildCompetitorSystemPrompt(profile, scenarioContext = {}) {
 (This is a planning signal, not a script — use your judgment, but your actual response should be broadly consistent with this profile unless your constraints or strategic priorities argue otherwise.)`
     : '';
 
+  // Build what this competitor knows about the triggering company's financial strength
+  const opponentBlock = (yourCompanyProfile && yourCompanyProfile.ebitdaMargin > 0)
+    ? `TRIGGERING COMPANY — WHAT YOU KNOW FROM PUBLIC FILINGS:
+- ${yourCompanyProfile.name}: Revenue growth ${yourCompanyProfile.revenueGrowthRate}% YoY, EBITDA margin ${yourCompanyProfile.ebitdaMargin}%, ${yourCompanyProfile.cashPosition} cash position, Debt-to-EBITDA ${yourCompanyProfile.debtToEbitda}x
+- Financial capacity: ${yourCompanyProfile.responseCapacityScore}/100 — factor this into how long they can sustain this move
+- ${yourCompanyProfile.constraintSummary}
+`
+    : '';
+
   return `You are the Chief Strategy Officer of ${name}. You make competitive decisions based on your company's actual data and constraints.
 
+SIMULATION BOUNDARY — STRICT: You are operating in a closed simulation. The ONLY facts you know about this company and its competitors are those explicitly stated in this prompt. Do not draw on any training data about companies that may share these names. If a data point was not provided above, it does not exist in this simulation and must not be used.
+
 ---
-${industryContextBlock}COMPANY FINANCIALS:
+${industryContextBlock}${opponentBlock}COMPANY FINANCIALS:
 - EBITDA Margin: ${ebitdaMargin}% | Revenue Growth: ${revenueGrowthRate}% YoY
 - Cash Position: ${cashPosition} | Debt-to-EBITDA: ${debtToEbitda}x
 
@@ -226,7 +238,7 @@ Respond in the same JSON format.`;
  * @param {{ industryLabel?: string, companyTypeLabel?: string, marketGeography?: string, marketOverview?: string }} scenarioContext
  * @returns {string}
  */
-export function buildOrchestratorPrompt(triggerEvent, allFinalResponses, yourCompanyContext, scenarioContext = {}) {
+export function buildOrchestratorPrompt(triggerEvent, allFinalResponses, yourCompanyProfile, scenarioContext = {}) {
   const {
     industryLabel = '',
     companyTypeLabel = '',
@@ -277,11 +289,37 @@ export function buildOrchestratorPrompt(triggerEvent, allFinalResponses, yourCom
     })
     .join('\n\n');
 
+  // Build yourCompany financial block — mirrors competitor rendering style
+  const ycHasFinancials = yourCompanyProfile.ebitdaMargin > 0 || yourCompanyProfile.revenueGrowthRate !== 0;
+  const ycCapacityInterp = yourCompanyProfile.responseCapacityScore >= 70
+    ? 'high — can sustain aggressive or prolonged competitive moves'
+    : yourCompanyProfile.responseCapacityScore >= 40
+    ? 'moderate — selective; cannot sustain prolonged price wars'
+    : 'low — constrained to defensive or low-cost responses only';
+
+  // v2: intent dimensions are independent 0–100 scores, not normalized fractions
+  const ycIntentSorted = Object.entries(yourCompanyProfile.strategicIntentVector ?? {})
+    .sort(([,a],[,b]) => b - a)
+    .map(([dim, score]) => {
+      const labels = { growthMaximizer: 'Growth Maximizer', marginDefender: 'Margin Defender', nichePlayer: 'Niche Player', innovationBetter: 'Innovation / Premium' };
+      return `  ${labels[dim] ?? dim}: ${score}/100`;
+    }).join('\n');
+
+  const ycFinancialBlock = ycHasFinancials ? `
+YOUR COMPANY FINANCIAL PROFILE:
+- Revenue Growth: ${yourCompanyProfile.revenueGrowthRate}% YoY | EBITDA Margin: ${yourCompanyProfile.ebitdaMargin}%
+- Cash Position: ${yourCompanyProfile.cashPosition} | Debt-to-EBITDA: ${yourCompanyProfile.debtToEbitda}x
+- Financial Capacity: ${yourCompanyProfile.responseCapacityScore}/100 → ${ycCapacityInterp}
+- Strategic Intent:\n${ycIntentSorted}
+${yourCompanyProfile.ceoPriorityStatement ? `- CEO Priority: "${yourCompanyProfile.ceoPriorityStatement}"` : ''}
+- Execution Constraints: ${yourCompanyProfile.constraintSummary}
+` : '';
+
   return `TRIGGER EVENT: ${triggerEvent}
 
-YOUR COMPANY: ${yourCompanyContext.name}${companyTypeLabel ? ` [${companyTypeLabel}]` : ''}
-YOUR STRATEGIC MOVE: ${yourCompanyContext.strategicMove}${yourCompanyContext.context ? `\nYOUR STRATEGIC CONTEXT: ${yourCompanyContext.context}` : ''}
-${scenarioBlock}
+YOUR COMPANY: ${yourCompanyProfile.name}${companyTypeLabel ? ` [${companyTypeLabel}]` : ''}
+YOUR STRATEGIC MOVE: ${yourCompanyProfile.strategicMove ?? ''}${yourCompanyProfile.context ? `\nYOUR STRATEGIC CONTEXT: ${yourCompanyProfile.context}` : ''}
+${ycFinancialBlock}${scenarioBlock}
 COMPETITOR FINAL RESPONSES:
 ${competitorSummaries}
 
@@ -307,6 +345,15 @@ STRICT LANGUAGE RULES:
 
 Synthesize these competitive dynamics and respond ONLY with valid JSON in this exact shape:
 {
+  "decisionBrief": {
+    "recommendedDecision": string (ONE sentence — the single clearest thing to do, written as a direct instruction, e.g. "Proceed with the 15% price cut and lock in multi-year contracts before ValueNet responds."),
+    "confidenceLevel": "High" | "Medium" | "Low",
+    "confidenceRationale": string (ONE sentence grounded in the data — why confidence is high/medium/low, e.g. "Two of three competitors lack the cash to respond aggressively within this quarter."),
+    "primaryReason": string (ONE sentence — the single biggest reason for the recommendation, with a real number, e.g. "ValueNet carries 4.2x debt and cannot sustain a price war for more than 60 days."),
+    "biggestWatchout": string (ONE sentence — the one risk most likely to change the outcome, e.g. "If PremiumConnect drops price >10% within 30 days, margin erosion will outpace the share gains."),
+    "decisionGate": string (ONE sentence — a measurable, observable trigger that would cause a course change, e.g. "If any competitor announces a price response exceeding 8% within the first 30 days, revisit the magnitude of this move."),
+    "executiveSummary": string (2-3 sentences. Plain English for a CXO with no prior context. What is happening, what is the recommended response, and what is the key thing to watch. No jargon. No hedging. Write it like a CFO briefing a board.)
+  },
   "marketEquilibrium": string (2-3 plain sentences: paint a picture of what the market looks like 90 days from now after all these moves play out — what does a customer or salesperson actually see?),
   "playerOutcomes": {
     "yourCompany": { "outcome": "wins"|"neutral"|"loses", "reasoning": string (1-2 plain sentences about what actually happens to this company), "financialEstimate": string (ONE sentence with a specific range anchored to actual input financials — e.g. "Estimated 3–5% revenue uplift (~$X–$Y based on $Z revenue base) from [cause] over [timeframe]". Omit if inputs are insufficient.) },
@@ -325,7 +372,81 @@ Synthesize these competitive dynamics and respond ONLY with valid JSON in this e
     "worstCase": { "description": string (what a bad outcome actually looks like), "conditions": string }
   },
   "keyRisks": string[] (max 4, each written as "Risk: [what could go wrong] → [plain consequence]"),
-  "watchlistSignals": string[] (max 5, each written as "Watch for [specific observable thing] — if it happens, [plain implication and action]")
+  "watchlistSignals": string[] (max 5, each written as "Watch for [specific observable thing] — if it happens, [plain implication and action]"),
+  "monitoringPlan": {
+    "next30Days": array of 2–4 objects — the most urgent signals to monitor in the first 30 days post-decision,
+    "next60Days": array of 2–4 objects — medium-term signals to track between days 30–60,
+    "next90Days": array of 2–4 objects — longer-term strategic signals to monitor between days 60–90
+  },
+  Each monitoring item has this shape: {
+    "signal": string (3–7 word label — what to watch for, e.g. "Competitor price cut announcement"),
+    "whyItMatters": string (ONE sentence — the business consequence if this signal fires),
+    "metric": string (the specific observable metric, e.g. "Shelf price scan data at top-10 grocery accounts"),
+    "threshold": string (quantitative trigger wherever possible, e.g. ">5% price reduction" or "2+ consecutive weeks of volume decline >3%"),
+    "ownerFunction": "Strategy" | "Finance" | "Sales" | "Marketing" | "Pricing" | "Competitive Intelligence" | "Revenue Growth Management" | "Other",
+    "actionIfTriggered": string (ONE sentence — the specific action to take if this signal fires)
+  },
+  "recommendationChangeTriggers": array of 3–6 objects — the market signals that would cause the recommendation to change. Each object: {
+    "trigger": string (short noun phrase describing the event — e.g. "Private label shelf space expands at top grocery accounts"),
+    "metricToMonitor": string (the specific, observable metric — e.g. "Private label CSD facings at top-5 grocery chains"),
+    "threshold": string (the measurable level that constitutes the trigger — e.g. ">2 point shelf-space increase" or ">10% price cut announcement". Use a quantitative threshold wherever possible; use a clearly stated qualitative signal only if no meaningful number exists),
+    "timeWindow": string (the monitoring window — e.g. "Next 60–90 days" or "Within Q2 2023"),
+    "recommendationImpact": string (ONE sentence — what specifically changes in the recommendation if this trigger fires, e.g. "Shift from broad price increase to targeted value-pack defense in price-sensitive channels"),
+    "urgency": "High" | "Medium" | "Low"
+  },
+  "strategicOptions": array of 3–5 objects comparing the main strategic paths available. ALWAYS include the current proposed strategy as one option. Include at least one safer/lower-risk alternative and one more aggressive/higher-upside alternative. Each object: {
+    "optionName": string (3–6 word label, e.g. "Proceed as Planned", "Deeper Price Cut", "Bundle Instead of Cut", "Hold Pricing, Increase Marketing"),
+    "description": string (ONE sentence — what the company would actually do),
+    "revenueUpside": string (estimated revenue impact range anchored to input financials — e.g. "+$1.2–2.4B over 12 months" or "+3–5% net revenue". Use a percentage range if no revenue figure was provided. NEVER return "High", "Medium", or "Low".),
+    "volumeRisk": string (estimated volume impact if the downside materialises — e.g. "2–4% volume decline" or "~500K–1M subscriber loss". Use directional range with units. NEVER return "High", "Medium", or "Low".),
+    "competitorRisk": "High" | "Medium" | "Low",
+    "retailerOrCustomerRisk": "High" | "Medium" | "Low",
+    "implementationComplexity": "High" | "Medium" | "Low",
+    "overallAssessment": "Preferred" | "Viable" | "Risky" | "Not Recommended",
+    "rationale": string (ONE sentence — why this assessment, grounded in the competitive dynamics)
+  },
+  "assumptionsUsed": array of 5–8 objects, each: {
+    "assumption": string (short label — what is being assumed, e.g. "Competitor price response timing"),
+    "value": string (the actual value assumed — use a range if uncertain, e.g. "Within 30–60 days" or "15–20% discount" or "Stable, no major shifts"),
+    "sourceType": "User Input" | "Model Inference" | "Default",
+    "confidence": "High" | "Medium" | "Low",
+    "impactIfWrong": string (ONE sentence — what specifically changes in the recommendation if this assumption proves wrong)
+  },
+  "evidenceClassification": {
+    "marketEquilibrium": tag,
+    "strategicRecommendation": tag,
+    "betterAlternative": tag | null,
+    "priorityActions": tag[] (one tag per action, same order),
+    "keyRisks": tag[] (one tag per risk, same order),
+    "watchlistSignals": tag[] (one tag per signal, same order),
+    "playerOutcomes": { "[each player key exactly as in playerOutcomes]": tag },
+    "confidenceBands": { "bestCase": tag, "likelyCase": tag, "worstCase": tag },
+    "decisionBrief": {
+      "recommendedDecision": tag,
+      "primaryReason": tag,
+      "biggestWatchout": tag,
+      "decisionGate": tag
+    }
+  }
 }
-No markdown, no explanation outside the JSON.`;
+No markdown, no explanation outside the JSON.
+
+ASSUMPTIONS RULES — follow these exactly:
+- Include 5–8 assumptions only. Do not pad with trivial ones.
+- Choose only the assumptions that most directly drive the recommendation. If an assumption changed, would the recommendation change? If no, exclude it.
+- "assumption" must be a short noun phrase (3–6 words), not a sentence.
+- "value" must be the concrete value assumed. Use a range if uncertain (e.g. "2–4 weeks", "10–20%"). Use plain qualitative language if no number is available (e.g. "No major regulatory action expected"). Never use vague words like "normal" or "standard".
+- "sourceType": "User Input" if the user explicitly provided this; "Model Inference" if the model derived or inferred it from the inputs; "Default" if it is a generic planning assumption not grounded in the inputs.
+- "confidence": "High" only if grounded in explicit input data; "Medium" if plausible but uncertain; "Low" if speculative or highly variable.
+- "impactIfWrong": one sentence — what specifically changes in the recommendation, not just "the analysis changes". Be concrete: "If [X] instead, then [specific consequence to the recommended action]."
+- Do not fabricate external data. If no source exists, use "Model Inference" or "Default".
+
+EVIDENCE CLASSIFICATION RULES — follow these exactly:
+- tag must be one of: "Known Fact" | "Assumption" | "Model Inference" | "User Input" | "Derived Calculation"
+- "Known Fact": only use when the claim is directly supported by specific numbers or facts from the competitor input data (revenue, margin, debt, headcount, pricing history). Never use this for forward-looking predictions.
+- "User Input": use when the claim directly restates or applies what the user explicitly provided (their strategic move, their company context, their stated goals).
+- "Assumption": use for planning conditions that are plausible but not guaranteed — market conditions, competitor intent, timing.
+- "Model Inference": use for all forward-looking predictions, synthesized conclusions, and AI-generated judgments about what will happen. This is the default when in doubt.
+- "Derived Calculation": use only when a claim is explicitly computed from input numbers (e.g., revenue impact anchored to stated revenue base, ratio comparisons between stated financials).
+- If you are uncertain, default to "Model Inference". Never use "Known Fact" for anything you inferred or predicted.`;
 }
