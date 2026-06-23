@@ -115,18 +115,40 @@ function calcOperationalFlexibility(operationalFlexibility, headcountTrend) {
 }
 
 /**
+ * Applies industry modifiers to a weight object and re-normalizes so weights sum to 1.0.
+ * @param {Object} baseWeights - {key: weight, ...}
+ * @param {Object} modifiers   - {key: multiplier, ...} from INDUSTRY_WEIGHT_MODIFIERS
+ * @param {string[]} keys      - which keys from modifiers apply to this weight group
+ */
+function applyIndustryModifiers(baseWeights, modifiers, keys) {
+  const result = {};
+  for (const k of keys) {
+    result[k] = (baseWeights[k] ?? 0) * (modifiers[k] ?? 1.0);
+  }
+  const total = Object.values(result).reduce((a, b) => a + b, 0);
+  if (total === 0) return baseWeights;
+  for (const k of keys) result[k] = result[k] / total;
+  return result;
+}
+
+/**
  * Calculates response capacity score (0–100).
  * Combines financial firepower, scale, and operational flexibility.
+ * Weights are moveType-keyed and then adjusted by industry modifier.
  */
-function calcResponseCapacity(cashPosition, debtToEbitda, ebitdaMargin, annualRevenue, operationalFlexibility, headcountTrend) {
+function calcResponseCapacity(cashPosition, debtToEbitda, ebitdaMargin, annualRevenue, operationalFlexibility, headcountTrend, moveType, industryKey) {
   const financialFirepower = calcFinancialFirepower(cashPosition, debtToEbitda, ebitdaMargin);
   const scale = calcScale(annualRevenue);
   const operationalFlex = calcOperationalFlexibility(operationalFlexibility, headcountTrend);
 
+  const baseWeights = config.RESPONSE_CAPACITY_WEIGHTS_BY_MOVE_TYPE[moveType] ?? config.RESPONSE_CAPACITY_WEIGHTS_BY_MOVE_TYPE.other;
+  const industryMod = config.INDUSTRY_WEIGHT_MODIFIERS[industryKey] ?? config.INDUSTRY_WEIGHT_MODIFIERS.other;
+  const weights = applyIndustryModifiers(baseWeights, industryMod, ['financialFirepower', 'scale', 'operationalFlex']);
+
   const capacity =
-    config.RESPONSE_CAPACITY_WEIGHTS.financialFirepower * financialFirepower +
-    config.RESPONSE_CAPACITY_WEIGHTS.scale * scale +
-    config.RESPONSE_CAPACITY_WEIGHTS.operationalFlex * operationalFlex;
+    weights.financialFirepower * financialFirepower +
+    weights.scale * scale +
+    weights.operationalFlex * operationalFlex;
 
   return round(capacity);
 }
@@ -134,14 +156,17 @@ function calcResponseCapacity(cashPosition, debtToEbitda, ebitdaMargin, annualRe
 /**
  * Calculates motivation score (0–100).
  * Combines stakes/exposure and behavioral disposition.
+ * Weights are moveType-keyed and adjusted by industry modifier.
  */
-function calcMotivation(exposureToMove, marketOverlapPct, moveType, lastThreePriceMoves, marketShareTrend, ceoPriorityStatement, recentNewsSignals) {
-  // Stakes
+function calcMotivation(exposureToMove, marketOverlapPct, moveType, lastThreePriceMoves, marketShareTrend, ceoPriorityStatement, recentNewsSignals, industryKey) {
+  const industryMod = config.INDUSTRY_WEIGHT_MODIFIERS[industryKey] ?? config.INDUSTRY_WEIGHT_MODIFIERS.other;
+
+  // Stakes (stakes/disposition split is moveType-keyed)
   const stakesScore =
     config.STAKES_SCORE_WEIGHTS.exposureToMove * exposureToMove +
     config.STAKES_SCORE_WEIGHTS.marketOverlapPct * marketOverlapPct;
 
-  // Disposition
+  // Disposition: raw signals
   const priceMoves = (lastThreePriceMoves || []).filter(m => m.direction !== 'hold');
   const rawPriceReactivity = priceMoves.length > 0 ? clamp(0, 100, average(priceMoves.map(m => m.magnitude)) * config.PRICE_REACTIVITY_MAGNITUDE_MULTIPLIER) : 0;
   const priceRelevance = config.PRICE_RELEVANCE_BY_MOVE_TYPE[moveType] ?? 0.5;
@@ -150,14 +175,22 @@ function calcMotivation(exposureToMove, marketOverlapPct, moveType, lastThreePri
   const shareDrive = config.SHARE_DRIVE_MAP[marketShareTrend] ?? config.SHARE_DRIVE_MAP.stable;
   const rhetoric = scoreRhetoric(ceoPriorityStatement + ' ' + (recentNewsSignals || []).join(' '));
 
+  // Disposition rollup with moveType + industry weights
+  const baseDispWeights = config.DISPOSITION_WEIGHTS_BY_MOVE_TYPE[moveType] ?? config.DISPOSITION_WEIGHTS_BY_MOVE_TYPE.other;
+  const dispWeights = applyIndustryModifiers(baseDispWeights, industryMod, ['priceReactivity', 'shareDrive', 'rhetoric']);
+
   const disposition =
-    config.DISPOSITION_WEIGHTS.priceReactivity * priceReactivity +
-    config.DISPOSITION_WEIGHTS.shareDrive * shareDrive +
-    config.DISPOSITION_WEIGHTS.rhetoric * rhetoric;
+    dispWeights.priceReactivity * priceReactivity +
+    dispWeights.shareDrive * shareDrive +
+    dispWeights.rhetoric * rhetoric;
+
+  // Motivation rollup with moveType + industry stakes/disposition split
+  const baseMotWeights = config.MOTIVATION_WEIGHTS_BY_MOVE_TYPE[moveType] ?? config.MOTIVATION_WEIGHTS_BY_MOVE_TYPE.other;
+  const motWeights = applyIndustryModifiers(baseMotWeights, industryMod, ['stakes', 'disposition']);
 
   const motivation =
-    config.MOTIVATION_WEIGHTS.stakes * stakesScore +
-    config.MOTIVATION_WEIGHTS.disposition * disposition;
+    motWeights.stakes * stakesScore +
+    motWeights.disposition * disposition;
 
   return {
     stakesScore: round(stakesScore),
@@ -377,8 +410,9 @@ export function buildCompetitorProfileV2(rawInputs, yourCompany) {
     responseConstraintLevel = 'none',
   } = rawInputs;
 
-  // Move type from yourCompany
+  // Move type and industry from yourCompany context
   const moveType = yourCompany?.moveType ?? 'price_cut';
+  const industryKey = yourCompany?.industry ?? 'other';
 
   // ── PILLAR C: RESPONSE CAPACITY ────────────────────────────────────────
   const responseCapacityScore = calcResponseCapacity(
@@ -387,10 +421,12 @@ export function buildCompetitorProfileV2(rawInputs, yourCompany) {
     ebitdaMargin,
     annualRevenue,
     operationalFlexibility,
-    headcountTrend
+    headcountTrend,
+    moveType,
+    industryKey
   );
 
-  // Your company's capacity (for relative firepower)
+  // Your company's capacity (for relative firepower) — same moveType/industry context
   const yourCapacityScore = yourCompany
     ? calcResponseCapacity(
         yourCompany.cashPosition,
@@ -398,7 +434,9 @@ export function buildCompetitorProfileV2(rawInputs, yourCompany) {
         yourCompany.ebitdaMargin,
         yourCompany.annualRevenue,
         yourCompany.operationalFlexibility,
-        'flat' // We don't track your headcount trend; use neutral
+        'flat',
+        moveType,
+        industryKey
       )
     : 50; // Fallback
 
@@ -418,7 +456,8 @@ export function buildCompetitorProfileV2(rawInputs, yourCompany) {
     lastThreePriceMoves,
     marketShareTrend,
     ceoPriorityStatement,
-    recentNewsSignals
+    recentNewsSignals,
+    industryKey
   );
   const { motivationScore } = motivationData;
 

@@ -52,11 +52,23 @@ export const OPS_ADJUSTMENT_BY_HEADCOUNT = {
 };
 
 // ── RESPONSE CAPACITY ROLLUP (Step 2.2) ──────────────────────────────────
-// How much of capacity comes from financial vs. scale vs. operational factors
-export const RESPONSE_CAPACITY_WEIGHTS = {
-  financialFirepower: 0.50,  // Financial strength is the foundation
-  scale: 0.30,               // Absolute size matters for sustained action
-  operationalFlex: 0.20,     // Speed to mobilize is worth 20%
+// Default weights (used when moveType = 'other' or unknown)
+export const RESPONSE_CAPACITY_WEIGHTS_DEFAULT = {
+  financialFirepower: 0.50,
+  scale: 0.30,
+  operationalFlex: 0.20,
+};
+
+// moveType-keyed weight tables (Phase 2)
+// Rationale: a price war is won on balance-sheet stamina; a product-launch response is an execution-speed problem
+export const RESPONSE_CAPACITY_WEIGHTS_BY_MOVE_TYPE = {
+  price_cut:          { financialFirepower: 0.55, scale: 0.25, operationalFlex: 0.20 },
+  price_increase:     { financialFirepower: 0.55, scale: 0.25, operationalFlex: 0.20 },
+  bundle_promo:       { financialFirepower: 0.50, scale: 0.25, operationalFlex: 0.25 },
+  product_launch:     { financialFirepower: 0.35, scale: 0.25, operationalFlex: 0.40 },
+  market_entry:       { financialFirepower: 0.30, scale: 0.45, operationalFlex: 0.25 },
+  capacity_expansion: { financialFirepower: 0.30, scale: 0.40, operationalFlex: 0.30 },
+  other:              { financialFirepower: 0.50, scale: 0.30, operationalFlex: 0.20 },
 };
 
 // ── RELATIVE FIREPOWER THRESHOLDS (Step 2.2) ──────────────────────────────
@@ -115,18 +127,42 @@ export const AGGRESSION_KEYWORDS = [
   'retaliate',
 ];
 
-// Disposition rollup: how much each factor drives behavioral aggression
-export const DISPOSITION_WEIGHTS = {
-  priceReactivity: 0.45,  // Price history is the strongest signal
-  shareDrive: 0.30,       // Market position trends matter
-  rhetoric: 0.25,         // CEO/news language is supportive
+// Disposition rollup defaults (used when moveType = 'other' or unknown)
+export const DISPOSITION_WEIGHTS_DEFAULT = {
+  priceReactivity: 0.45,
+  shareDrive: 0.30,
+  rhetoric: 0.25,
+};
+
+// moveType-keyed disposition weights
+// Rationale: for a product launch, CEO posture predicts counter-launch better than past pricing behavior
+export const DISPOSITION_WEIGHTS_BY_MOVE_TYPE = {
+  price_cut:          { priceReactivity: 0.55, shareDrive: 0.25, rhetoric: 0.20 },
+  price_increase:     { priceReactivity: 0.50, shareDrive: 0.25, rhetoric: 0.25 },
+  bundle_promo:       { priceReactivity: 0.45, shareDrive: 0.30, rhetoric: 0.25 },
+  product_launch:     { priceReactivity: 0.20, shareDrive: 0.30, rhetoric: 0.50 },
+  market_entry:       { priceReactivity: 0.15, shareDrive: 0.35, rhetoric: 0.50 },
+  capacity_expansion: { priceReactivity: 0.25, shareDrive: 0.45, rhetoric: 0.30 },
+  other:              { priceReactivity: 0.45, shareDrive: 0.30, rhetoric: 0.25 },
 };
 
 // ── MOTIVATION ROLLUP (Step 2.3) ──────────────────────────────────────────
-// Stakes vs. disposition in overall motivation
-export const MOTIVATION_WEIGHTS = {
-  stakes: 0.60,       // Exposure drives motivation more than temperament
-  disposition: 0.40,  // But disposition shapes how they respond
+// Default stakes vs. disposition weights
+export const MOTIVATION_WEIGHTS_DEFAULT = {
+  stakes: 0.60,
+  disposition: 0.40,
+};
+
+// moveType-keyed motivation weights
+// Rationale: market_entry is an existential threat — stakes dominate; price_increase may be an umbrella opportunity
+export const MOTIVATION_WEIGHTS_BY_MOVE_TYPE = {
+  price_cut:          { stakes: 0.65, disposition: 0.35 },
+  price_increase:     { stakes: 0.55, disposition: 0.45 },
+  bundle_promo:       { stakes: 0.60, disposition: 0.40 },
+  product_launch:     { stakes: 0.45, disposition: 0.55 },
+  market_entry:       { stakes: 0.70, disposition: 0.30 },
+  capacity_expansion: { stakes: 0.55, disposition: 0.45 },
+  other:              { stakes: 0.60, disposition: 0.40 },
 };
 
 // ── AWARENESS (Step 2.4) ──────────────────────────────────────────────────
@@ -224,4 +260,40 @@ export const CONFIDENCE_LABELS = {
   high: { threshold: 80, label: 'High' },
   medium: { threshold: 50, label: 'Medium' },
   low: { threshold: 0, label: 'Low' },
+};
+
+// ── INDUSTRY WEIGHT MODIFIERS (Phase 2) ───────────────────────────────────
+// Multipliers applied to each weight component AFTER moveType lookup.
+// After applying, weights within each group are re-normalized to sum to 1.0.
+// Default (all 1.0) = identical to pure moveType table.
+// Keys match frontend INDUSTRY_OPTIONS values.
+export const INDUSTRY_WEIGHT_MODIFIERS = {
+  // Pharma: cash/R&D signal critical; price reactivity less behavioral (regulated)
+  pharma_biotech:     { financialFirepower: 1.3, scale: 1.0, operationalFlex: 1.0, stakes: 1.0, disposition: 1.0, priceReactivity: 0.5, shareDrive: 1.0, rhetoric: 1.5 },
+  // Telecom: scale dominates (network effects, infrastructure); ops less relevant
+  telecom:            { financialFirepower: 1.0, scale: 1.3, operationalFlex: 0.8, stakes: 1.0, disposition: 1.0, priceReactivity: 1.0, shareDrive: 1.1, rhetoric: 1.0 },
+  // Retail/FMCG: high price elasticity, thin margins make stakes more direct
+  retail_ecommerce:   { financialFirepower: 1.0, scale: 1.0, operationalFlex: 1.1, stakes: 1.2, disposition: 1.0, priceReactivity: 1.3, shareDrive: 1.0, rhetoric: 0.9 },
+  // CPG: similar to retail — price moves are direct and impactful
+  cpg_fmcg:           { financialFirepower: 1.0, scale: 1.1, operationalFlex: 1.0, stakes: 1.1, disposition: 1.0, priceReactivity: 1.2, shareDrive: 1.1, rhetoric: 0.9 },
+  // SaaS/software: operational speed matters; switching friction is structural
+  saas_software:      { financialFirepower: 1.0, scale: 0.9, operationalFlex: 1.4, stakes: 1.0, disposition: 1.0, priceReactivity: 0.9, shareDrive: 1.0, rhetoric: 1.1 },
+  // Financial services: regulatory context dampens rhetoric signal; compliance constraints real
+  financial_services: { financialFirepower: 1.2, scale: 1.1, operationalFlex: 0.9, stakes: 1.0, disposition: 1.0, priceReactivity: 0.8, shareDrive: 1.0, rhetoric: 0.7 },
+  // Energy/utilities: capex-intensive so scale matters; many state-adjacent so speed penalty common
+  energy_utilities:   { financialFirepower: 1.1, scale: 1.2, operationalFlex: 0.8, stakes: 1.0, disposition: 1.0, priceReactivity: 0.9, shareDrive: 1.0, rhetoric: 0.9 },
+  // Industrials/manufacturing: operational capacity central; financial endurance matters
+  industrials_manufacturing: { financialFirepower: 1.1, scale: 1.1, operationalFlex: 1.1, stakes: 1.0, disposition: 1.0, priceReactivity: 1.0, shareDrive: 1.0, rhetoric: 0.9 },
+  // Healthcare: similar to pharma but less R&D intensive
+  healthcare:         { financialFirepower: 1.2, scale: 1.0, operationalFlex: 1.0, stakes: 1.0, disposition: 1.0, priceReactivity: 0.7, shareDrive: 1.0, rhetoric: 1.2 },
+  // Media/entertainment: rhetoric and narrative matter; share trends very relevant
+  media_entertainment: { financialFirepower: 1.0, scale: 1.0, operationalFlex: 1.1, stakes: 1.0, disposition: 1.0, priceReactivity: 0.8, shareDrive: 1.2, rhetoric: 1.3 },
+  // Logistics/transport: ops and scale dominate; price reactivity moderate
+  logistics_transport: { financialFirepower: 1.0, scale: 1.2, operationalFlex: 1.2, stakes: 1.0, disposition: 1.0, priceReactivity: 1.0, shareDrive: 1.0, rhetoric: 0.9 },
+  // Real estate: financial firepower dominant (capital intensive); slow ops
+  real_estate:        { financialFirepower: 1.3, scale: 1.1, operationalFlex: 0.7, stakes: 1.0, disposition: 1.0, priceReactivity: 0.8, shareDrive: 1.0, rhetoric: 0.9 },
+  // Education/ed-tech: ops speed matters (software-like); share trend signals commitment
+  education_edtech:   { financialFirepower: 1.0, scale: 0.9, operationalFlex: 1.2, stakes: 1.0, disposition: 1.0, priceReactivity: 0.9, shareDrive: 1.1, rhetoric: 1.1 },
+  // Default/other: all 1.0 — pure moveType table
+  other:              { financialFirepower: 1.0, scale: 1.0, operationalFlex: 1.0, stakes: 1.0, disposition: 1.0, priceReactivity: 1.0, shareDrive: 1.0, rhetoric: 1.0 },
 };

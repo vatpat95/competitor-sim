@@ -231,6 +231,60 @@ assert(between(fullProfile.shareDrive, 0, 100), 'shareDrive is 0–100');
 assert(between(fullProfile.rhetoric, 0, 100), 'rhetoric is 0–100');
 assert(between(fullProfile.disposition, 0, 100), 'disposition is 0–100');
 
+// ── TEST 8: PHASE 1 — moveType-keyed weight tables ───────────────────────
+// a) All 7 rows × 3 tables must have weights that sum to 1.0 ± 0.001
+// b) Same competitor under price_cut vs market_entry must produce different scores
+// c) Same competitor under industry pharma vs retail must produce different scores
+
+console.log('\n=== TEST 8: Phase 1 — moveType-keyed weights ===');
+
+import * as config from './scoringConfig.js';
+
+// a) Weight table integrity — all rows sum to 1.0
+const MOVE_TYPES = ['price_cut', 'price_increase', 'bundle_promo', 'product_launch', 'market_entry', 'capacity_expansion', 'other'];
+const TOLERANCE = 0.001;
+
+for (const mt of MOVE_TYPES) {
+  const capW = config.RESPONSE_CAPACITY_WEIGHTS_BY_MOVE_TYPE[mt];
+  const capSum = capW.financialFirepower + capW.scale + capW.operationalFlex;
+  assert(Math.abs(capSum - 1.0) < TOLERANCE, `RESPONSE_CAPACITY_WEIGHTS_BY_MOVE_TYPE['${mt}'] sums to 1.0 (got ${capSum.toFixed(4)})`);
+
+  const motW = config.MOTIVATION_WEIGHTS_BY_MOVE_TYPE[mt];
+  const motSum = motW.stakes + motW.disposition;
+  assert(Math.abs(motSum - 1.0) < TOLERANCE, `MOTIVATION_WEIGHTS_BY_MOVE_TYPE['${mt}'] sums to 1.0 (got ${motSum.toFixed(4)})`);
+
+  const dispW = config.DISPOSITION_WEIGHTS_BY_MOVE_TYPE[mt];
+  const dispSum = dispW.priceReactivity + dispW.shareDrive + dispW.rhetoric;
+  assert(Math.abs(dispSum - 1.0) < TOLERANCE, `DISPOSITION_WEIGHTS_BY_MOVE_TYPE['${mt}'] sums to 1.0 (got ${dispSum.toFixed(4)})`);
+}
+
+// b) price_cut vs market_entry — scores must differ
+const yourCoPriceCut = { ...sampleYourCompany, moveType: 'price_cut', industry: 'other' };
+const yourCoMarketEntry = { ...sampleYourCompany, moveType: 'market_entry', industry: 'other' };
+const profilePriceCut = buildCompetitorProfileV2(sampleCompetitor, yourCoPriceCut);
+const profileMarketEntry = buildCompetitorProfileV2(sampleCompetitor, yourCoMarketEntry);
+assert(
+  profilePriceCut.responseCapacityScore !== profileMarketEntry.responseCapacityScore ||
+  profilePriceCut.motivationScore !== profileMarketEntry.motivationScore,
+  `price_cut vs market_entry produces different scores (cap: ${profilePriceCut.responseCapacityScore} vs ${profileMarketEntry.responseCapacityScore}, mot: ${profilePriceCut.motivationScore} vs ${profileMarketEntry.motivationScore})`
+);
+console.log(`  price_cut  → cap=${profilePriceCut.responseCapacityScore}, mot=${profilePriceCut.motivationScore}, disp=${profilePriceCut.disposition}`);
+console.log(`  market_entry → cap=${profileMarketEntry.responseCapacityScore}, mot=${profileMarketEntry.motivationScore}, disp=${profileMarketEntry.disposition}`);
+
+// c) industry pharma_biotech vs cpg_fmcg — scores must differ
+const yourCoPharma = { ...sampleYourCompany, moveType: 'price_cut', industry: 'pharma_biotech' };
+const yourCoCPG = { ...sampleYourCompany, moveType: 'price_cut', industry: 'cpg_fmcg' };
+const profilePharma = buildCompetitorProfileV2(sampleCompetitor, yourCoPharma);
+const profileCPG = buildCompetitorProfileV2(sampleCompetitor, yourCoCPG);
+assert(
+  profilePharma.responseCapacityScore !== profileCPG.responseCapacityScore ||
+  profilePharma.motivationScore !== profileCPG.motivationScore ||
+  profilePharma.disposition !== profileCPG.disposition,
+  `pharma_biotech vs cpg_fmcg produces different scores (cap: ${profilePharma.responseCapacityScore} vs ${profileCPG.responseCapacityScore}, mot: ${profilePharma.motivationScore} vs ${profileCPG.motivationScore})`
+);
+console.log(`  pharma_biotech → cap=${profilePharma.responseCapacityScore}, mot=${profilePharma.motivationScore}, disp=${profilePharma.disposition}`);
+console.log(`  cpg_fmcg       → cap=${profileCPG.responseCapacityScore}, mot=${profileCPG.motivationScore}, disp=${profileCPG.disposition}`);
+
 // ── SAMPLE PROFILE OUTPUT ──────────────────────────────────────────────────
 
 console.log('\n=== SAMPLE FULL PROFILE ===');
