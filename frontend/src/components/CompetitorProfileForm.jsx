@@ -689,8 +689,37 @@ function SliderField({ label, value, onChange, hint }) {
   )
 }
 
+const CONSTRAINT_CHIP_LABEL = { none: 'No constraints', moderate: 'Moderate constraints', severe: 'Severe constraints' }
+const FLEX_CHIP_LABEL = { high: 'High flex', medium: 'Medium flex', low: 'Low flex' }
+const FRICTION_CHIP_LABEL = { high: 'High friction', medium: 'Medium friction', low: 'Low friction' }
+
+function SummaryChip({ children, highlight }) {
+  return (
+    <span
+      className="text-[11px] px-2 py-0.5 rounded-full whitespace-nowrap"
+      style={{
+        background: highlight ? '#1c1400' : '#1f2937',
+        color: highlight ? '#fbbf24' : '#9ca3af',
+        border: `1px solid ${highlight ? '#78350f' : '#374151'}`,
+      }}
+    >
+      {children}
+    </span>
+  )
+}
+
 function AdvancedSection({ competitor, update }) {
   const [open, setOpen] = useState(false)
+
+  const exposure = competitor.exposureToMove ?? 50
+  const overlap = competitor.marketOverlapPct ?? 70
+  const opsFlex = competitor.operationalFlexibility || 'medium'
+  const friction = competitor.switchingFriction || 'medium'
+  const constraint = competitor.responseConstraintLevel || 'none'
+
+  // Highlight values that differ from the defaults — these are the ones a user has actually
+  // gone in and judgment-tuned, vs. fields still sitting on the flat default assumption.
+  const isDefault = exposure === 50 && overlap === 70 && opsFlex === 'medium' && friction === 'medium' && constraint === 'none'
 
   return (
     <div className="mt-5 rounded-lg overflow-hidden" style={{ border: '1px solid #1f2937' }}>
@@ -703,6 +732,19 @@ function AdvancedSection({ competitor, update }) {
         <span>Advanced / optional <span className="text-xs text-gray-600 font-normal ml-2">Sharpens the prediction — not required to run</span></span>
         <span className="text-gray-600">{open ? '▲' : '▼'}</span>
       </button>
+
+      {!open && (
+        <div className="flex flex-wrap items-center gap-1.5 px-4 py-2.5" style={{ background: '#0d1117', borderTop: '1px solid #1f2937' }}>
+          <SummaryChip highlight={exposure !== 50}>Exposure {exposure}%</SummaryChip>
+          <SummaryChip highlight={overlap !== 70}>Overlap {overlap}%</SummaryChip>
+          <SummaryChip highlight={opsFlex !== 'medium'}>{FLEX_CHIP_LABEL[opsFlex]}</SummaryChip>
+          <SummaryChip highlight={friction !== 'medium'}>{FRICTION_CHIP_LABEL[friction]}</SummaryChip>
+          <SummaryChip highlight={constraint !== 'none'}>{CONSTRAINT_CHIP_LABEL[constraint]}</SummaryChip>
+          {isDefault && (
+            <span className="text-[11px] text-gray-600 ml-1">— all on defaults, click to tune</span>
+          )}
+        </div>
+      )}
 
       {open && (
         <div className="px-4 py-4" style={{ background: '#111827', borderTop: '1px solid #1f2937' }}>

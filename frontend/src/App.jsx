@@ -393,7 +393,8 @@ const COCACOLA_PEPSI_SCENARIO = {
     rdSpendPct: 0,                // CPG — R&D spend minimal; marketing investment (~$4B) is the primary competitive lever
     marketShareTrend: 'stable',   // 46.3% US CSD share — holding vs PepsiCo 24.7% (Statista 2022); no significant gain or loss
     headcountTrend: 'flat',       // ~79,000 employees (2022). Source: KO DEF 14A FY2022
-    operationalFlexibility: 'medium',
+    operationalFlexibility: 'medium', // Coca-Cola's concentrate model relies on independent bottler partners (e.g. Coca-Cola Consolidated) for pricing execution at shelf — less direct control than a fully vertically integrated competitor
+    ownershipType: 'public',          // NYSE: KO
     annualRevenue: 43000,          // FY2022. Source: Coca-Cola FY2022 10-K (SEC)
     ceoPriorityStatement: "There will be pricing in 2023 to reflect the continuing inflation in import and SG&A costs. We need to own that pricing by delivering value consumers appreciate through marketing and innovation. Our 46% market share is a competitive moat we intend to defend through brand investment, not promotional discounting. — James Quincey, Coca-Cola CEO (Q4 2022 earnings call, Feb 9, 2023)",
     lastThreePriceMoves: [
@@ -411,6 +412,14 @@ const COCACOLA_PEPSI_SCENARIO = {
       cashPosition: 'moderate',       // Cash $4.95B, short-term investments $394M. Source: PepsiCo 10-K FY2022
       debtToEbitda: 2.8,              // [calculated] Total debt $39.1B / $14.2B EBITDA. Source: PepsiCo 10-K FY2022
       rdSpendPct: 1,                  // ~$600-700M R&D on $86B revenue; CPG beverages industry norm
+      // v2 advanced fields — grounded in FY2022 10-K segment disclosure + known industry structure
+      annualRevenue: 86400,           // FY2022 net revenue. Source: PepsiCo 10-K FY2022 (SEC)
+      ownershipType: 'public',        // NASDAQ: PEP
+      operationalFlexibility: 'high', // PBNA is majority self-distributed/refranchised under PepsiCo's control (unlike Coke's independent-bottler model), and Frito-Lay's DSD network gives PepsiCo more direct pricing/promo execution control
+      switchingFriction: 'low',       // CSD is a low-loyalty, impulse-driven category; PepsiCo's own Q4 2022 data showed PBNA volume -2% on a 7% price increase — direct evidence consumers were already trading down/switching, i.e. low friction
+      exposureToMove: 50,             // PepsiCo Beverages North America (PBNA) segment = $26.6B of $86.4B FY2022 total revenue (~31%); weighted up slightly because a CSD-wide pricing signal from the category leader also shapes pricing conversations in PepsiCo's Latin America and international beverage segments. Source: PepsiCo FY2022 10-K segment data (SEC)
+      marketOverlapPct: 85,           // PBNA directly overlaps with Coca-Cola's US CSD business in the same retail/foodservice channels; this is the segment Statista's 24.7% share figure refers to
+      responseConstraintLevel: 'none', // No antitrust/regulatory bar on independently matching a competitor's price increase; investor sentiment in 2022-23 favored continued pricing, not against it
       lastThreePriceMoves: [
         { direction: 'up', magnitude: 12, context: 'Q2 2022: +12% price/mix increase across North America Beverages and Frito-Lay to offset commodity and supply chain inflation. Source: PepsiCo Q2 2022 8-K (SEC).' },
         { direction: 'up', magnitude: 10, context: 'Q1 2022: +10% price/mix increase, first major pricing action of the inflation cycle. Source: PepsiCo Q1 2022 8-K (SEC).' },
@@ -437,6 +446,14 @@ const COCACOLA_PEPSI_SCENARIO = {
       cashPosition: 'moderate',       // Debt-to-EBITDA 2.8x as reported by management. Source: KDP FY2022 earnings
       debtToEbitda: 2.8,              // Management-disclosed figure. Source: KDP FY2022 earnings release
       rdSpendPct: 1,
+      // v2 advanced fields — grounded in FY2022 segment disclosure + known industry structure
+      annualRevenue: 14057,           // FY2022 net sales. Source: KDP PR Newswire Feb 23 2023
+      ownershipType: 'public',        // NASDAQ: KDP
+      operationalFlexibility: 'medium', // KDP owns most of its US beverage bottling/DSD post-2018 Keurig merger (more direct control than Coke's franchise model), but its much smaller manufacturing and distribution footprint vs. Coke/Pepsi limits scale-driven flexibility
+      switchingFriction: 'low',       // Same low-loyalty CSD category dynamics as PepsiCo — Dr Pepper, 7UP, Canada Dry compete on shelf with no meaningful consumer lock-in
+      exposureToMove: 60,             // KDP's Refreshment Beverages segment (Dr Pepper, 7UP, Canada Dry, Snapple, Core Hydration) was ~$7.9B of $14.057B FY2022 net sales (~56%) — the segment directly exposed to a US CSD pricing move; Coffee Systems (Keurig) is the other ~44% and is largely unaffected. Source: KDP FY2022 10-K segment data
+      marketOverlapPct: 70,           // CSD brands compete directly with Coke/Pepsi for US grocery/retail shelf space, but KDP's Coffee Systems business has no overlap with Coca-Cola at all, pulling the blended overlap below PepsiCo's
+      responseConstraintLevel: 'none', // No antitrust/regulatory bar on following the category leader's price increase
       lastThreePriceMoves: [
         { direction: 'up', magnitude: 10, context: 'FY2022: Net sales grew 11% driven by pricing across Dr Pepper, 7UP, Snapple, and Keurig coffee. Source: KDP FY2022 annual results (PR Newswire Feb 23 2023).' },
         { direction: 'up', magnitude: 8,  context: '2021: Multiple pricing rounds across beverage and coffee portfolios to offset commodity inflation. Source: KDP investor materials.' },
@@ -911,7 +928,7 @@ function SimulateTab({ isLoading, error, simulationResult, onRun, onRerun, onBac
         <SimulationResults
           result={simulationResult}
           yourCompany={yourCompany}
-          rawCompetitors={competitors}
+          rawCompetitors={competitors.filter(c => c.name.trim())}
         />
       )}
     </div>
@@ -971,7 +988,7 @@ export default function App() {
       const res = await fetch('http://localhost:3001/api/simulate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ yourCompany, competitors }),
+        body: JSON.stringify({ yourCompany, competitors: competitors.filter(c => c.name.trim()) }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || `Server error ${res.status}`)
