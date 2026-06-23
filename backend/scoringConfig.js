@@ -254,6 +254,11 @@ export const NEGATION_WORDS = ['not', 'won\'t', 'won\'t', 'doesn\'t', 'don\'t', 
 // How many words to look back for negation
 export const NEGATION_LOOKAHEAD_WORDS = 4;
 
+// ── CONFIDENCE SCORING (Phase 2) ──────────────────────────────────────────
+// Real confidence replaces the hardcoded 60.
+// Score = floor + (populated/total) * (ceiling - floor)
+export const CONFIDENCE_RANGE = { floor: 40, ceiling: 100 };
+
 // ── PROSE SUMMARY CONFIDENCE LEVELS ──────────────────────────────────────
 // Used to label confidence in the Predicted Reaction Profile
 export const CONFIDENCE_LABELS = {
@@ -261,6 +266,22 @@ export const CONFIDENCE_LABELS = {
   medium: { threshold: 50, label: 'Medium' },
   low: { threshold: 0, label: 'Low' },
 };
+
+// ── R&D SPEND CONTRIBUTION (Phase 2) ────────────────────────────────────
+// rdSpendPct boosts operationalFlex for innovation-type moves only.
+// Formula: clamp(0, MAX_RD_OPS_BOOST, rdSpendPct * RD_OPS_BOOST_MULTIPLIER)
+export const RD_OPS_BOOST_MULTIPLIER = 1.5;
+export const RD_OPS_BOOST_MAX = 15;
+// Move types where R&D pipeline is operationally relevant
+export const RD_OPS_BOOST_MOVE_TYPES = new Set(['product_launch', 'market_entry']);
+
+// ── REVENUE GROWTH MOMENTUM (Phase 2) ────────────────────────────────────
+// revenueGrowthRate modifies disposition: fast growers fight harder to protect momentum.
+// Formula: clamp(FLOOR, CEILING, (growthRate - BASELINE) * MULTIPLIER)
+export const GROWTH_MOMENTUM_BASELINE = 5;    // 5% growth = neutral
+export const GROWTH_MOMENTUM_MULTIPLIER = 0.75;
+export const GROWTH_MOMENTUM_FLOOR = -10;
+export const GROWTH_MOMENTUM_CEILING = 15;
 
 // ── INDUSTRY WEIGHT MODIFIERS (Phase 2) ───────────────────────────────────
 // Multipliers applied to each weight component AFTER moveType lookup.

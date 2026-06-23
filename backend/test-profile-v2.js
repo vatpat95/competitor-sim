@@ -285,6 +285,65 @@ assert(
 console.log(`  pharma_biotech → cap=${profilePharma.responseCapacityScore}, mot=${profilePharma.motivationScore}, disp=${profilePharma.disposition}`);
 console.log(`  cpg_fmcg       → cap=${profileCPG.responseCapacityScore}, mot=${profileCPG.motivationScore}, disp=${profileCPG.disposition}`);
 
+// ── TEST 9: PHASE 2 — confidence, rdSpendPct, revenueGrowthRate ──────────
+
+console.log('\n=== TEST 9: Phase 2 — confidence / rdSpendPct / revenueGrowthRate ===');
+
+// a) 0/7 optional fields → confidence = floor (40)
+const sparseCompetitor = {
+  name: 'Sparse',
+  ebitdaMargin: 15,
+  cashPosition: 'moderate',
+  debtToEbitda: 2,
+  revenueGrowthRate: 5,
+  marketShareTrend: 'stable',
+  // all 7 optional fields deliberately omitted: annualRevenue, ownershipType,
+  // operationalFlexibility, switchingFriction, exposureToMove, marketOverlapPct, responseConstraintLevel
+};
+const profileSparse = buildCompetitorProfileV2(sparseCompetitor, sampleYourCompany);
+assert(profileSparse.predictedReactionProfile.confidence === 40, `0/7 optional fields → confidence = 40 (got ${profileSparse.predictedReactionProfile.confidence})`);
+
+// b) 7/7 optional fields → confidence = ceiling (100)
+const richCompetitor = {
+  ...sparseCompetitor,
+  annualRevenue: 5000,
+  ownershipType: 'public',
+  operationalFlexibility: 'medium',
+  switchingFriction: 'medium',
+  exposureToMove: 60,
+  marketOverlapPct: 70,
+  responseConstraintLevel: 'none',
+};
+const profileRich = buildCompetitorProfileV2(richCompetitor, sampleYourCompany);
+assert(profileRich.predictedReactionProfile.confidence === 100, `7/7 optional fields → confidence = 100 (got ${profileRich.predictedReactionProfile.confidence})`);
+
+// c) rdSpendPct boosts responseCapacityScore for product_launch but not price_cut
+const yourCoLaunch = { ...sampleYourCompany, moveType: 'product_launch', industry: 'other' };
+const highRD = { ...sampleCompetitor, rdSpendPct: 12 };
+const lowRD  = { ...sampleCompetitor, rdSpendPct: 1 };
+const profileHighRD = buildCompetitorProfileV2(highRD, yourCoLaunch);
+const profileLowRD  = buildCompetitorProfileV2(lowRD, yourCoLaunch);
+assert(profileHighRD.responseCapacityScore > profileLowRD.responseCapacityScore,
+  `rdSpendPct 12% > 1% boosts responseCapacityScore for product_launch (${profileHighRD.responseCapacityScore} > ${profileLowRD.responseCapacityScore})`);
+console.log(`  product_launch rdSpend 12% → cap=${profileHighRD.responseCapacityScore}  vs  1% → cap=${profileLowRD.responseCapacityScore}`);
+
+// rdSpendPct must NOT affect responseCapacityScore for price_cut
+const yourCoPriceCut2 = { ...sampleYourCompany, moveType: 'price_cut', industry: 'other' };
+const profileHighRD_pc = buildCompetitorProfileV2(highRD, yourCoPriceCut2);
+const profileLowRD_pc  = buildCompetitorProfileV2(lowRD, yourCoPriceCut2);
+assert(profileHighRD_pc.responseCapacityScore === profileLowRD_pc.responseCapacityScore,
+  `rdSpendPct has no effect on responseCapacityScore for price_cut (${profileHighRD_pc.responseCapacityScore} === ${profileLowRD_pc.responseCapacityScore})`);
+
+// d) revenueGrowthRate: high growth → higher disposition than low/negative growth
+const highGrowthComp = { ...sampleCompetitor, revenueGrowthRate: 25 };
+const lowGrowthComp  = { ...sampleCompetitor, revenueGrowthRate: -5 };
+const yourCoOther = { ...sampleYourCompany, moveType: 'price_cut', industry: 'other' };
+const profileHighGrowth = buildCompetitorProfileV2(highGrowthComp, yourCoOther);
+const profileLowGrowth  = buildCompetitorProfileV2(lowGrowthComp, yourCoOther);
+assert(profileHighGrowth.disposition > profileLowGrowth.disposition,
+  `25% growth scores higher disposition than -5% growth (${profileHighGrowth.disposition} > ${profileLowGrowth.disposition})`);
+console.log(`  growth +25% → disposition=${profileHighGrowth.disposition}  vs  -5% → disposition=${profileLowGrowth.disposition}  (adj range: ${profileHighGrowth.growthMomentumAdj} vs ${profileLowGrowth.growthMomentumAdj})`);
+
 // ── SAMPLE PROFILE OUTPUT ──────────────────────────────────────────────────
 
 console.log('\n=== SAMPLE FULL PROFILE ===');

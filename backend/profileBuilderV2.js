@@ -106,12 +106,29 @@ function calcScale(annualRevenue) {
 }
 
 /**
- * Calculates operational flexibility (0–100) from base level and headcount trend.
+ * Calculates operational flexibility (0–100) from base level, headcount trend, and R&D spend.
+ * rdSpendPct boosts ops for product_launch and market_entry moves only.
  */
-function calcOperationalFlexibility(operationalFlexibility, headcountTrend) {
+function calcOperationalFlexibility(operationalFlexibility, headcountTrend, rdSpendPct, moveType) {
   const base = config.OPS_BASE_MAP[operationalFlexibility] ?? config.OPS_BASE_MAP.medium;
-  const adj = config.OPS_ADJUSTMENT_BY_HEADCOUNT[headcountTrend] ?? 0;
-  return round(clamp(0, 100, base + adj));
+  const headcountAdj = config.OPS_ADJUSTMENT_BY_HEADCOUNT[headcountTrend] ?? 0;
+  const rdBoost = config.RD_OPS_BOOST_MOVE_TYPES.has(moveType)
+    ? clamp(0, config.RD_OPS_BOOST_MAX, (rdSpendPct ?? 0) * config.RD_OPS_BOOST_MULTIPLIER)
+    : 0;
+  return round(clamp(0, 100, base + headcountAdj + rdBoost));
+}
+
+/**
+ * Calculates a real confidence score (40–100) based on how many optional fields were provided.
+ */
+function calcConfidence(rawInputs) {
+  const populated = config.OPTIONAL_FIELDS_FOR_CONFIDENCE.filter(field => {
+    const val = rawInputs[field];
+    return val !== null && val !== undefined;
+  }).length;
+  const ratio = populated / config.OPTIONAL_FIELDS_FOR_CONFIDENCE.length;
+  const { floor, ceiling } = config.CONFIDENCE_RANGE;
+  return round(floor + ratio * (ceiling - floor));
 }
 
 /**
@@ -136,10 +153,10 @@ function applyIndustryModifiers(baseWeights, modifiers, keys) {
  * Combines financial firepower, scale, and operational flexibility.
  * Weights are moveType-keyed and then adjusted by industry modifier.
  */
-function calcResponseCapacity(cashPosition, debtToEbitda, ebitdaMargin, annualRevenue, operationalFlexibility, headcountTrend, moveType, industryKey) {
+function calcResponseCapacity(cashPosition, debtToEbitda, ebitdaMargin, annualRevenue, operationalFlexibility, headcountTrend, moveType, industryKey, rdSpendPct) {
   const financialFirepower = calcFinancialFirepower(cashPosition, debtToEbitda, ebitdaMargin);
   const scale = calcScale(annualRevenue);
-  const operationalFlex = calcOperationalFlexibility(operationalFlexibility, headcountTrend);
+  const operationalFlex = calcOperationalFlexibility(operationalFlexibility, headcountTrend, rdSpendPct, moveType);
 
   const baseWeights = config.RESPONSE_CAPACITY_WEIGHTS_BY_MOVE_TYPE[moveType] ?? config.RESPONSE_CAPACITY_WEIGHTS_BY_MOVE_TYPE.other;
   const industryMod = config.INDUSTRY_WEIGHT_MODIFIERS[industryKey] ?? config.INDUSTRY_WEIGHT_MODIFIERS.other;
@@ -158,7 +175,7 @@ function calcResponseCapacity(cashPosition, debtToEbitda, ebitdaMargin, annualRe
  * Combines stakes/exposure and behavioral disposition.
  * Weights are moveType-keyed and adjusted by industry modifier.
  */
-function calcMotivation(exposureToMove, marketOverlapPct, moveType, lastThreePriceMoves, marketShareTrend, ceoPriorityStatement, recentNewsSignals, industryKey) {
+function calcMotivation(exposureToMove, marketOverlapPct, moveType, lastThreePriceMoves, marketShareTrend, ceoPriorityStatement, recentNewsSignals, industryKey, revenueGrowthRate) {
   const industryMod = config.INDUSTRY_WEIGHT_MODIFIERS[industryKey] ?? config.INDUSTRY_WEIGHT_MODIFIERS.other;
 
   // Stakes (stakes/disposition split is moveType-keyed)
@@ -175,14 +192,22 @@ function calcMotivation(exposureToMove, marketOverlapPct, moveType, lastThreePri
   const shareDrive = config.SHARE_DRIVE_MAP[marketShareTrend] ?? config.SHARE_DRIVE_MAP.stable;
   const rhetoric = scoreRhetoric(ceoPriorityStatement + ' ' + (recentNewsSignals || []).join(' '));
 
-  // Disposition rollup with moveType + industry weights
+  // Revenue growth momentum: fast growers fight harder to protect momentum
+  const growthMomentumAdj = clamp(
+    config.GROWTH_MOMENTUM_FLOOR,
+    config.GROWTH_MOMENTUM_CEILING,
+    ((revenueGrowthRate ?? config.GROWTH_MOMENTUM_BASELINE) - config.GROWTH_MOMENTUM_BASELINE) * config.GROWTH_MOMENTUM_MULTIPLIER
+  );
+
+  // Disposition rollup with moveType + industry weights, then growth momentum added after
   const baseDispWeights = config.DISPOSITION_WEIGHTS_BY_MOVE_TYPE[moveType] ?? config.DISPOSITION_WEIGHTS_BY_MOVE_TYPE.other;
   const dispWeights = applyIndustryModifiers(baseDispWeights, industryMod, ['priceReactivity', 'shareDrive', 'rhetoric']);
 
-  const disposition =
+  const dispositionBase =
     dispWeights.priceReactivity * priceReactivity +
     dispWeights.shareDrive * shareDrive +
     dispWeights.rhetoric * rhetoric;
+  const disposition = round(clamp(0, 100, dispositionBase + growthMomentumAdj));
 
   // Motivation rollup with moveType + industry stakes/disposition split
   const baseMotWeights = config.MOTIVATION_WEIGHTS_BY_MOVE_TYPE[moveType] ?? config.MOTIVATION_WEIGHTS_BY_MOVE_TYPE.other;
@@ -197,7 +222,8 @@ function calcMotivation(exposureToMove, marketOverlapPct, moveType, lastThreePri
     priceReactivity: round(priceReactivity),
     shareDrive: round(shareDrive),
     rhetoric: round(rhetoric),
-    disposition: round(disposition),
+    growthMomentumAdj: round(growthMomentumAdj),
+    disposition,
     motivationScore: round(motivation),
   };
 }
@@ -231,7 +257,8 @@ function buildPredictedReactionProfile(
   responseConstraintLevel,
   moveType,
   intent,
-  regulatoryConstraints
+  regulatoryConstraints,
+  precomputedConfidence
 ) {
   // Response Likelihood
   let responseLikelihood = round(motivationScore * awarenessFactor);
@@ -298,9 +325,7 @@ function buildPredictedReactionProfile(
     vectors.push('Measured competitive response');
   }
 
-  // Confidence: based on how many optional fields are provided
-  // For now, default to medium; we'll refine this when frontend fields are wired in Phase 4
-  const confidence = round(60); // TODO: Phase 4 — calculate from optional fields
+  const confidence = precomputedConfidence;
 
   return {
     responseLikelihood,
@@ -423,7 +448,8 @@ export function buildCompetitorProfileV2(rawInputs, yourCompany) {
     operationalFlexibility,
     headcountTrend,
     moveType,
-    industryKey
+    industryKey,
+    rdSpendPct
   );
 
   // Your company's capacity (for relative firepower) — same moveType/industry context
@@ -436,7 +462,8 @@ export function buildCompetitorProfileV2(rawInputs, yourCompany) {
         yourCompany.operationalFlexibility,
         'flat',
         moveType,
-        industryKey
+        industryKey,
+        yourCompany.rdSpendPct
       )
     : 50; // Fallback
 
@@ -457,8 +484,12 @@ export function buildCompetitorProfileV2(rawInputs, yourCompany) {
     marketShareTrend,
     ceoPriorityStatement,
     recentNewsSignals,
-    industryKey
+    industryKey,
+    revenueGrowthRate
   );
+
+  // ── CONFIDENCE ─────────────────────────────────────────────────────────
+  const confidence = calcConfidence(rawInputs);
   const { motivationScore } = motivationData;
 
   // ── PILLAR A: AWARENESS ────────────────────────────────────────────────
@@ -487,7 +518,8 @@ export function buildCompetitorProfileV2(rawInputs, yourCompany) {
     responseConstraintLevel,
     moveType,
     intent,
-    regulatoryConstraints
+    regulatoryConstraints,
+    confidence
   );
 
   // ── PROSE SUMMARIES ────────────────────────────────────────────────────
@@ -570,6 +602,7 @@ export function buildCompetitorProfileV2(rawInputs, yourCompany) {
     priceReactivity: motivationData.priceReactivity,
     shareDrive: motivationData.shareDrive,
     rhetoric: motivationData.rhetoric,
+    growthMomentumAdj: motivationData.growthMomentumAdj,
     disposition: motivationData.disposition,
     // Computed scores — Awareness pillar
     awarenessScore,
