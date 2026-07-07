@@ -29,6 +29,25 @@ const COMPETITOR_TYPE_OPTIONS = [
   { value: 'disruptor',           label: 'Disruptor / New Entrant' },
 ]
 
+// v2: move type — drives stakes weighting and awareness defaults (spec section 2.1)
+const MOVE_TYPE_OPTIONS = [
+  { value: 'price_cut',           label: 'Price cut' },
+  { value: 'price_increase',      label: 'Price increase' },
+  { value: 'product_launch',      label: 'Product launch' },
+  { value: 'market_entry',        label: 'Market entry' },
+  { value: 'bundle_promo',        label: 'Bundle / promo' },
+  { value: 'capacity_expansion',  label: 'Capacity expansion' },
+  { value: 'other',               label: 'Other' },
+]
+
+// v2: move visibility — overrides the move-type default (spec section 2.4)
+const MOVE_VISIBILITY_OPTIONS = [
+  { value: '',       label: 'Auto (based on move type)' },
+  { value: 'high',   label: 'High — hard to miss' },
+  { value: 'medium', label: 'Medium — normal market monitoring' },
+  { value: 'low',    label: 'Low — easy to overlook' },
+]
+
 // ── Defaults ──────────────────────────────────────────────────────────────────
 
 function defaultCompetitor() {
@@ -47,6 +66,14 @@ function defaultCompetitor() {
     recentNewsSignals: [],
     regulatoryConstraints: '',
     competitorType: '',
+    // v2 — all optional, defaults mirror backend/scoringConfig.js
+    annualRevenue: null,
+    ownershipType: 'public',
+    operationalFlexibility: 'medium',
+    switchingFriction: 'medium',
+    exposureToMove: 50,
+    marketOverlapPct: 70,
+    responseConstraintLevel: 'none',
   }
 }
 
@@ -82,6 +109,14 @@ const TELECOM_COMPETITORS = [
       'Partnership with mid-market procurement platform',
     ],
     regulatoryConstraints: '',
+    // v2
+    annualRevenue: 3000,
+    ownershipType: 'public',
+    operationalFlexibility: 'high',
+    switchingFriction: 'medium',
+    exposureToMove: 65,
+    marketOverlapPct: 80,
+    responseConstraintLevel: 'none',
   },
   {
     name: 'PremiumConnect',
@@ -106,6 +141,14 @@ const TELECOM_COMPETITORS = [
       'Renewed multi-year contracts with 4 Fortune 500 accounts',
     ],
     regulatoryConstraints: 'Subject to enterprise data residency requirements in EU; limits rapid geographic expansion.',
+    // v2
+    annualRevenue: 5500,
+    ownershipType: 'public',
+    operationalFlexibility: 'medium',
+    switchingFriction: 'high',
+    exposureToMove: 20,
+    marketOverlapPct: 40,
+    responseConstraintLevel: 'moderate',
   },
   {
     name: 'RegionalPlus',
@@ -130,6 +173,14 @@ const TELECOM_COMPETITORS = [
       "Announced 'Regional Loyalty' pricing program for long-term customers",
     ],
     regulatoryConstraints: 'State-level telecom licensing in 6 states limits ability to exit or restructure quickly.',
+    // v2
+    annualRevenue: 800,
+    ownershipType: 'family_private',
+    operationalFlexibility: 'low',
+    switchingFriction: 'high',
+    exposureToMove: 45,
+    marketOverlapPct: 50,
+    responseConstraintLevel: 'severe',
   },
 ]
 
@@ -148,6 +199,8 @@ const DEMO_SCENARIOS = [
       companyType: 'incumbent_leader',
       marketGeography: 'North America',
       marketOverview: 'Mature market with ~2% annual growth, high churn (18–22% annually), and mid-market consolidation driven by low-cost challengers. Enterprise segment is sticky; SMB and mid-market are the current battleground.',
+      moveType: 'price_cut',
+      ebitdaMargin: 18, debtToEbitda: 2.2, cashPosition: 'moderate', operationalFlexibility: 'medium', annualRevenue: 4500,
     },
     competitors: TELECOM_COMPETITORS,
   },
@@ -169,6 +222,8 @@ const DEMO_SCENARIOS = [
       companyType: 'incumbent_leader',
       marketGeography: 'North America',
       marketOverview: 'Mature market with ~2% annual growth, high churn (18–22% annually), and mid-market consolidation driven by low-cost challengers. Enterprise segment is sticky; SMB and mid-market are the current battleground.',
+      moveType: 'bundle_promo',
+      ebitdaMargin: 18, debtToEbitda: 2.2, cashPosition: 'moderate', operationalFlexibility: 'medium', annualRevenue: 4500,
     },
     competitors: TELECOM_COMPETITORS,
   },
@@ -189,6 +244,8 @@ const DEMO_SCENARIOS = [
       companyType: 'incumbent_leader',
       marketGeography: 'North America',
       marketOverview: 'Mature market with ~2% annual growth, high churn (18–22% annually), and mid-market consolidation driven by low-cost challengers. Enterprise segment is sticky; SMB and mid-market are the current battleground.',
+      moveType: 'market_entry',
+      ebitdaMargin: 18, debtToEbitda: 2.2, cashPosition: 'moderate', operationalFlexibility: 'medium', annualRevenue: 4500,
     },
     competitors: TELECOM_COMPETITORS,
   },
@@ -210,6 +267,22 @@ const TMOBILE_UNCARRIER_SCENARIO = {
     companyType: 'disruptor',
     marketGeography: 'United States',
     marketOverview: 'US wireless market with ~300M subscribers (2013). AT&T and Verizon hold ~65% combined market share. Market transitioning to smartphones and LTE data plans. Monthly postpaid churn ranges 1.5–2.8% across carriers. AT&T and Verizon both restructured pricing upward in 2011–2012. Sprint is financially distressed from the Nextel integration and Network Vision rebuild. Growing consumer frustration with 2-year contracts, device upgrade restrictions, and opaque fees.',
+    moveType: 'price_cut',
+    revenueGrowthRate: -3,        // FY2012: $21.3B vs $21.9B (2011) — 14 consecutive quarters of postpaid net losses. Source: TMUS 2012 10-K
+    ebitdaMargin: 22,             // [calc] Adjusted OIBDA ~$4.7B / $21.3B revenue. Source: TMUS 2012 10-K
+    cashPosition: 'moderate',     // $3B AT&T breakup fee received + ~$1.5B operating cash; offset by MetroPCS merger costs
+    debtToEbitda: 3.2,            // [calc] Long-term debt ~$15.1B / ~$4.7B adjusted OIBDA. Source: TMUS 2012 10-K
+    rdSpendPct: 1.5,              // Network investment heavy but classified as capex; minimal formal R&D line item
+    marketShareTrend: 'losing',   // 4th-place carrier; losing postpaid net adds to AT&T and Verizon for 14 consecutive quarters
+    headcountTrend: 'flat',       // ~35,000 employees pre-MetroPCS merger. Source: TMUS 2012 DEF 14A
+    operationalFlexibility: 'medium',
+    annualRevenue: 19700,          // FY2012 standalone T-Mobile USA revenue, pre-MetroPCS merger. Source: TMUS 2012 10-K
+    ceoPriorityStatement: "We are the un-carrier. We will do what the big guys refuse to do — eliminate contracts, end the two-year upgrade cycle, and compete on the customer's terms. Our LTE rollout is behind AT&T and Verizon but our pricing model is our weapon. We have 12 months to prove this works before the MetroPCS merger closes. — John Legere, T-Mobile CEO (strategic mandate, March 2013)",
+    lastThreePriceMoves: [
+      { direction: 'down', magnitude: 15, context: 'March 2013: Uncarrier launch — Simple Choice plans at $50/month, ~15% below comparable AT&T/Verizon postpaid plans with no annual contract. Source: T-Mobile Uncarrier press release Mar 26 2013.' },
+      { direction: 'hold', magnitude: 0, context: 'FY2012: Held pricing flat while losing subscribers — previous management unwilling to cut ahead of AT&T acquisition attempt.' },
+      { direction: 'hold', magnitude: 0, context: 'FY2011: Maintained rate card pricing through AT&T merger attempt and post-breakup period.' },
+    ],
   },
   competitors: [
     {
@@ -312,6 +385,23 @@ const COCACOLA_PEPSI_SCENARIO = {
     companyType: 'incumbent_leader',
     marketGeography: 'United States',
     marketOverview: "US beverage market ~$100B+ annual retail sales. CSD category declining ~1-2% annually by volume as consumers shift to water and energy drinks. Coca-Cola holds 46.3% US CSD share vs PepsiCo 24.7% (Statista 2022). All major players took 10-14% price increases in 2021-2022 to offset commodity inflation (US CPI peaked 9.1% June 2022). Consumer wallets under pressure — low-income households beginning to trade down to private label. Private label beverage shelf space expanding at major retailers.",
+    moveType: 'price_increase',
+    revenueGrowthRate: 11,        // FY2022: $43.0B vs $38.7B (2021). Source: KO 10-K FY2022 (SEC)
+    ebitdaMargin: 32,             // [calc] Op. income $10.9B + D&A ~$2.7B = $13.6B / $43.0B revenue. Source: KO FY2022 10-K
+    cashPosition: 'strong',       // Cash + short-term investments ~$9.5B at FY2022 year-end. Source: KO FY2022 10-K
+    debtToEbitda: 2.5,            // [calc] Total debt ~$34B / ~$13.6B EBITDA. Source: KO FY2022 10-K
+    rdSpendPct: 0,                // CPG — R&D spend minimal; marketing investment (~$4B) is the primary competitive lever
+    marketShareTrend: 'stable',   // 46.3% US CSD share — holding vs PepsiCo 24.7% (Statista 2022); no significant gain or loss
+    headcountTrend: 'flat',       // ~79,000 employees (2022). Source: KO DEF 14A FY2022
+    operationalFlexibility: 'medium', // Coca-Cola's concentrate model relies on independent bottler partners (e.g. Coca-Cola Consolidated) for pricing execution at shelf — less direct control than a fully vertically integrated competitor
+    ownershipType: 'public',          // NYSE: KO
+    annualRevenue: 43000,          // FY2022. Source: Coca-Cola FY2022 10-K (SEC)
+    ceoPriorityStatement: "There will be pricing in 2023 to reflect the continuing inflation in import and SG&A costs. We need to own that pricing by delivering value consumers appreciate through marketing and innovation. Our 46% market share is a competitive moat we intend to defend through brand investment, not promotional discounting. — James Quincey, Coca-Cola CEO (Q4 2022 earnings call, Feb 9, 2023)",
+    lastThreePriceMoves: [
+      { direction: 'up', magnitude: 12, context: 'FY2022 full year: ~12% blended price/mix increase across US portfolio to offset commodity and packaging inflation. Source: KO FY2022 10-K (SEC).' },
+      { direction: 'up', magnitude: 10, context: 'FY2021: ~10% effective price increase across sparkling beverages — first major pricing cycle of the post-COVID inflation period. Source: KO FY2021 10-K (SEC).' },
+      { direction: 'hold', magnitude: 0, context: 'H1 2023 guidance: holding pricing; no further increases planned beyond carryover from 2022 rounds. Focus shifts to marketing investment to defend volume. Source: KO Q4 2022 earnings call, Feb 9, 2023.' },
+    ],
   },
   competitors: [
     {
@@ -322,6 +412,14 @@ const COCACOLA_PEPSI_SCENARIO = {
       cashPosition: 'moderate',       // Cash $4.95B, short-term investments $394M. Source: PepsiCo 10-K FY2022
       debtToEbitda: 2.8,              // [calculated] Total debt $39.1B / $14.2B EBITDA. Source: PepsiCo 10-K FY2022
       rdSpendPct: 1,                  // ~$600-700M R&D on $86B revenue; CPG beverages industry norm
+      // v2 advanced fields — grounded in FY2022 10-K segment disclosure + known industry structure
+      annualRevenue: 86400,           // FY2022 net revenue. Source: PepsiCo 10-K FY2022 (SEC)
+      ownershipType: 'public',        // NASDAQ: PEP
+      operationalFlexibility: 'high', // PBNA is majority self-distributed/refranchised under PepsiCo's control (unlike Coke's independent-bottler model), and Frito-Lay's DSD network gives PepsiCo more direct pricing/promo execution control
+      switchingFriction: 'low',       // CSD is a low-loyalty, impulse-driven category; PepsiCo's own Q4 2022 data showed PBNA volume -2% on a 7% price increase — direct evidence consumers were already trading down/switching, i.e. low friction
+      exposureToMove: 50,             // PepsiCo Beverages North America (PBNA) segment = $26.6B of $86.4B FY2022 total revenue (~31%); weighted up slightly because a CSD-wide pricing signal from the category leader also shapes pricing conversations in PepsiCo's Latin America and international beverage segments. Source: PepsiCo FY2022 10-K segment data (SEC)
+      marketOverlapPct: 85,           // PBNA directly overlaps with Coca-Cola's US CSD business in the same retail/foodservice channels; this is the segment Statista's 24.7% share figure refers to
+      responseConstraintLevel: 'none', // No antitrust/regulatory bar on independently matching a competitor's price increase; investor sentiment in 2022-23 favored continued pricing, not against it
       lastThreePriceMoves: [
         { direction: 'up', magnitude: 12, context: 'Q2 2022: +12% price/mix increase across North America Beverages and Frito-Lay to offset commodity and supply chain inflation. Source: PepsiCo Q2 2022 8-K (SEC).' },
         { direction: 'up', magnitude: 10, context: 'Q1 2022: +10% price/mix increase, first major pricing action of the inflation cycle. Source: PepsiCo Q1 2022 8-K (SEC).' },
@@ -348,6 +446,14 @@ const COCACOLA_PEPSI_SCENARIO = {
       cashPosition: 'moderate',       // Debt-to-EBITDA 2.8x as reported by management. Source: KDP FY2022 earnings
       debtToEbitda: 2.8,              // Management-disclosed figure. Source: KDP FY2022 earnings release
       rdSpendPct: 1,
+      // v2 advanced fields — grounded in FY2022 segment disclosure + known industry structure
+      annualRevenue: 14057,           // FY2022 net sales. Source: KDP PR Newswire Feb 23 2023
+      ownershipType: 'public',        // NASDAQ: KDP
+      operationalFlexibility: 'medium', // KDP owns most of its US beverage bottling/DSD post-2018 Keurig merger (more direct control than Coke's franchise model), but its much smaller manufacturing and distribution footprint vs. Coke/Pepsi limits scale-driven flexibility
+      switchingFriction: 'low',       // Same low-loyalty CSD category dynamics as PepsiCo — Dr Pepper, 7UP, Canada Dry compete on shelf with no meaningful consumer lock-in
+      exposureToMove: 60,             // KDP's Refreshment Beverages segment (Dr Pepper, 7UP, Canada Dry, Snapple, Core Hydration) was ~$7.9B of $14.057B FY2022 net sales (~56%) — the segment directly exposed to a US CSD pricing move; Coffee Systems (Keurig) is the other ~44% and is largely unaffected. Source: KDP FY2022 10-K segment data
+      marketOverlapPct: 70,           // CSD brands compete directly with Coke/Pepsi for US grocery/retail shelf space, but KDP's Coffee Systems business has no overlap with Coca-Cola at all, pulling the blended overlap below PepsiCo's
+      responseConstraintLevel: 'none', // No antitrust/regulatory bar on following the category leader's price increase
       lastThreePriceMoves: [
         { direction: 'up', magnitude: 10, context: 'FY2022: Net sales grew 11% driven by pricing across Dr Pepper, 7UP, Snapple, and Keurig coffee. Source: KDP FY2022 annual results (PR Newswire Feb 23 2023).' },
         { direction: 'up', magnitude: 8,  context: '2021: Multiple pricing rounds across beverage and coffee portfolios to offset commodity inflation. Source: KDP investor materials.' },
@@ -486,6 +592,34 @@ function ScenarioSetupTab({ yourCompany, setYourCompany, onLoadDemo, onLoadRealS
           />
         </Field>
 
+        <div className="grid grid-cols-2 gap-4">
+          <Field label="Move type" hint="Selects how stakes and visibility are weighted for each competitor.">
+            <select
+              value={yourCompany.moveType || 'price_cut'}
+              onChange={e => update('moveType', e.target.value)}
+              className={selectCls}
+              style={{ background: '#111827' }}
+            >
+              {MOVE_TYPE_OPTIONS.map(o => (
+                <option key={o.value} value={o.value}>{o.label}</option>
+              ))}
+            </select>
+          </Field>
+
+          <Field label="Move visibility (optional)" hint="How noticeable this move is — leave on auto unless you have a reason to override.">
+            <select
+              value={yourCompany.moveVisibility || ''}
+              onChange={e => update('moveVisibility', e.target.value)}
+              className={selectCls}
+              style={{ background: '#111827' }}
+            >
+              {MOVE_VISIBILITY_OPTIONS.map(o => (
+                <option key={o.value} value={o.value}>{o.label}</option>
+              ))}
+            </select>
+          </Field>
+        </div>
+
         <Field
           label="Context (optional)"
           hint="Additional background that helps the simulation understand your rationale."
@@ -572,6 +706,102 @@ function ScenarioSetupTab({ yourCompany, setYourCompany, onLoadDemo, onLoadRealS
             />
           </Field>
         </div>
+      </div>
+
+      {/* ── Your Financial Profile — used both to anchor financial estimates and (v2) to compute relative firepower vs. competitors ── */}
+      <div className="rounded-xl p-5 space-y-4" style={{ background: '#111827', border: '1px solid #1f2937' }}>
+        <div>
+          <p className="text-sm font-semibold text-white">Your Financial Profile</p>
+          <p className="text-xs text-gray-500 mt-0.5">Used to anchor financial estimates and assess your capacity to execute and sustain the move.</p>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <Field label="Revenue Growth Rate (%)" hint="YoY revenue growth at time of this move.">
+            <input type="number" step="0.1" value={yourCompany.revenueGrowthRate}
+              onChange={e => update('revenueGrowthRate', parseFloat(e.target.value) || 0)}
+              className={inputCls} placeholder="e.g. 11" />
+          </Field>
+          <Field label="EBITDA Margin (%)">
+            <input type="number" step="0.1" value={yourCompany.ebitdaMargin}
+              onChange={e => update('ebitdaMargin', parseFloat(e.target.value) || 0)}
+              className={inputCls} placeholder="e.g. 32" />
+          </Field>
+          <Field label="Debt-to-EBITDA (x)">
+            <input type="number" step="0.1" value={yourCompany.debtToEbitda}
+              onChange={e => update('debtToEbitda', parseFloat(e.target.value) || 0)}
+              className={inputCls} placeholder="e.g. 2.5" />
+          </Field>
+          <Field label="R&D Spend (% of revenue)" hint="Optional — leave 0 if not applicable.">
+            <input type="number" step="0.1" value={yourCompany.rdSpendPct}
+              onChange={e => update('rdSpendPct', parseFloat(e.target.value) || 0)}
+              className={inputCls} placeholder="e.g. 4" />
+          </Field>
+          <Field label="Annual revenue ($M, optional)" hint="Used to scale absolute size — leave blank if unknown.">
+            <input
+              type="number"
+              value={yourCompany.annualRevenue ?? ''}
+              onChange={e => update('annualRevenue', e.target.value === '' ? null : parseFloat(e.target.value))}
+              placeholder="e.g. 5000"
+              step="1"
+              className={inputCls}
+            />
+          </Field>
+          <Field label="Operational flexibility">
+            <select
+              value={yourCompany.operationalFlexibility}
+              onChange={e => update('operationalFlexibility', e.target.value)}
+              className={selectCls}
+              style={{ background: '#111827' }}
+            >
+              <option value="high">High</option>
+              <option value="medium">Medium</option>
+              <option value="low">Low</option>
+            </select>
+          </Field>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <Field label="Cash Position">
+            <div className="flex rounded-lg overflow-hidden border border-gray-700">
+              {['weak','moderate','strong'].map(v => (
+                <button key={v} onClick={() => update('cashPosition', v)}
+                  className="flex-1 py-2 text-xs font-semibold capitalize transition-colors"
+                  style={{ background: yourCompany.cashPosition === v ? '#1e3a5f' : '#111827', color: yourCompany.cashPosition === v ? '#7dd3fc' : '#6b7280' }}>
+                  {v}
+                </button>
+              ))}
+            </div>
+          </Field>
+          <Field label="Market Share Trend">
+            <div className="flex rounded-lg overflow-hidden border border-gray-700">
+              {['losing','stable','gaining'].map(v => (
+                <button key={v} onClick={() => update('marketShareTrend', v)}
+                  className="flex-1 py-2 text-xs font-semibold capitalize transition-colors"
+                  style={{ background: yourCompany.marketShareTrend === v ? '#1e3a5f' : '#111827', color: yourCompany.marketShareTrend === v ? '#7dd3fc' : '#6b7280' }}>
+                  {v}
+                </button>
+              ))}
+            </div>
+          </Field>
+          <Field label="Headcount Trend">
+            <div className="flex rounded-lg overflow-hidden border border-gray-700">
+              {['shrinking','flat','growing'].map(v => (
+                <button key={v} onClick={() => update('headcountTrend', v)}
+                  className="flex-1 py-2 text-xs font-semibold capitalize transition-colors"
+                  style={{ background: yourCompany.headcountTrend === v ? '#1e3a5f' : '#111827', color: yourCompany.headcountTrend === v ? '#7dd3fc' : '#6b7280' }}>
+                  {v}
+                </button>
+              ))}
+            </div>
+          </Field>
+        </div>
+
+        <Field label="CEO Priority Statement" hint="Verbatim or paraphrased strategic mandate from leadership.">
+          <textarea value={yourCompany.ceoPriorityStatement}
+            onChange={e => update('ceoPriorityStatement', e.target.value)}
+            placeholder="e.g. We will compete on brand strength and pricing discipline — not promotional discounting."
+            rows={2} className={`${inputCls} resize-none`} />
+        </Field>
       </div>
 
       {yourCompany.name && yourCompany.strategicMove && (
@@ -698,7 +928,7 @@ function SimulateTab({ isLoading, error, simulationResult, onRun, onRerun, onBac
         <SimulationResults
           result={simulationResult}
           yourCompany={yourCompany}
-          rawCompetitors={competitors}
+          rawCompetitors={competitors.filter(c => c.name.trim())}
         />
       )}
     </div>
@@ -710,31 +940,59 @@ function SimulateTab({ isLoading, error, simulationResult, onRun, onRerun, onBac
 export default function App() {
   const [activeTab, setActiveTab] = useState('setup')
   const [activeCompetitor, setActiveCompetitor] = useState(0)
-  const [yourCompany, setYourCompany] = useState({ name: '', strategicMove: '', context: '', industry: '', industryOther: '', companyType: '', marketGeography: '', marketOverview: '' })
+  const [yourCompany, setYourCompany] = useState({
+    name: '', strategicMove: '', context: '', industry: '', industryOther: '', companyType: '', marketGeography: '', marketOverview: '',
+    // financials — used to anchor financial estimates and (v2) compute relative firepower vs. competitors
+    revenueGrowthRate: 0,
+    ebitdaMargin: 15,
+    cashPosition: 'moderate',
+    debtToEbitda: 2,
+    rdSpendPct: 0,
+    marketShareTrend: 'stable',
+    headcountTrend: 'flat',
+    ceoPriorityStatement: '',
+    lastThreePriceMoves: [],
+    operationalFlexibility: 'medium',
+    annualRevenue: null,
+    // v2 — move type/visibility drive stakes weighting and awareness (spec sections 2.1, 2.4)
+    moveType: 'price_cut',
+    moveVisibility: '',
+  })
   const [competitors, setCompetitors] = useState([
     defaultCompetitor(),
     defaultCompetitor(),
     defaultCompetitor(),
   ])
-  const [simulationResult, setSimulationResult] = useState(null)
+  const [simulationResult, setSimulationResult] = useState(() => {
+    try {
+      const saved = sessionStorage.getItem('competitorSim_lastResult')
+      return saved ? JSON.parse(saved) : null
+    } catch { return null }
+  })
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState(null)
 
   const canRunSim = Boolean(yourCompany.name.trim() && yourCompany.strategicMove.trim())
 
+  function persistResult(data) {
+    try { sessionStorage.setItem('competitorSim_lastResult', JSON.stringify(data)) } catch { /* quota exceeded */ }
+    setSimulationResult(data)
+  }
+
   async function runSimulation() {
     setSimulationResult(null)
+    sessionStorage.removeItem('competitorSim_lastResult')
     setError(null)
     setIsLoading(true)
     try {
       const res = await fetch('http://localhost:3001/api/simulate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ yourCompany, competitors }),
+        body: JSON.stringify({ yourCompany, competitors: competitors.filter(c => c.name.trim()) }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || `Server error ${res.status}`)
-      setSimulationResult(data)
+      persistResult(data)
     } catch (err) {
       setError(err.message)
     } finally {
@@ -747,6 +1005,7 @@ export default function App() {
     setYourCompany(scenario.yourCompany)
     setCompetitors(scenario.competitors)
     setSimulationResult(null)
+    sessionStorage.removeItem('competitorSim_lastResult')
     setError(null)
     setActiveCompetitor(0)
     setActiveTab('competitors')
@@ -756,6 +1015,7 @@ export default function App() {
     setYourCompany(TMOBILE_UNCARRIER_SCENARIO.yourCompany)
     setCompetitors(TMOBILE_UNCARRIER_SCENARIO.competitors)
     setSimulationResult(null)
+    sessionStorage.removeItem('competitorSim_lastResult')
     setError(null)
     setActiveCompetitor(0)
     setActiveTab('competitors')
@@ -765,6 +1025,7 @@ export default function App() {
     setYourCompany(COCACOLA_PEPSI_SCENARIO.yourCompany)
     setCompetitors(COCACOLA_PEPSI_SCENARIO.competitors)
     setSimulationResult(null)
+    sessionStorage.removeItem('competitorSim_lastResult')
     setError(null)
     setActiveCompetitor(0)
     setActiveTab('competitors')
@@ -853,6 +1114,7 @@ export default function App() {
                 <CompetitorProfileForm
                   competitor={competitors[activeCompetitor]}
                   index={activeCompetitor}
+                  yourCompany={yourCompany}
                   onChange={(idx, updated) =>
                     setCompetitors(prev => prev.map((c, j) => j === idx ? updated : c))
                   }

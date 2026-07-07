@@ -1,8 +1,9 @@
-import { buildCompetitorProfile } from './profileBuilder.js';
+import { buildCompetitorProfileV2 } from './profileBuilderV2.js';
 import { buildCompetitorSystemPrompt, buildCompetitorRoundPrompt } from './prompts.js';
 
 // ── 1. Build ValueNet profile ────────────────────────────────────────────────
-const valuenetProfile = buildCompetitorProfile({
+const yourCompany = { name: 'YourCo', ebitdaMargin: 15, cashPosition: 'moderate', debtToEbitda: 2, annualRevenue: 3000, operationalFlexibility: 'medium' };
+const valuenetProfile = buildCompetitorProfileV2({
   name: "ValueNet",
   revenueGrowthRate: 18.5,
   ebitdaMargin: 12.3,
@@ -26,7 +27,14 @@ const valuenetProfile = buildCompetitorProfile({
     "Partnership with mid-market procurement platform",
   ],
   regulatoryConstraints: "",
-});
+  exposureToMove: 50,
+  marketOverlapPct: 75,
+  operationalFlexibility: 'high',
+  switchingFriction: 'medium',
+  responseConstraintLevel: 'none',
+  ownershipType: 'public',
+  annualRevenue: 3000,
+}, yourCompany);
 
 // ── 2. Build and print system prompt ────────────────────────────────────────
 const systemPrompt = buildCompetitorSystemPrompt(valuenetProfile);
@@ -36,8 +44,8 @@ console.log(systemPrompt);
 // ── 3. Assertions on system prompt ──────────────────────────────────────────
 const errors = [];
 
-if (!systemPrompt.includes("Financial Capacity Score")) {
-  errors.push('System prompt missing "Financial Capacity Score"');
+if (!systemPrompt.includes("Response Capacity") && !systemPrompt.includes("responseCapacityScore") && !systemPrompt.includes("Capacity Score")) {
+  errors.push('System prompt missing response capacity score reference');
 }
 if (!systemPrompt.includes("STRATEGIC INTENT")) {
   errors.push('System prompt missing "STRATEGIC INTENT"');
