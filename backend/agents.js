@@ -10,6 +10,7 @@ import {
 } from './prompts.js';
 // v2 scoring (primary)
 import { buildCompetitorProfileV2 } from './profileBuilderV2.js';
+import { extractStrategicIntent } from './intentExtractor.js';
 // v1 scoring (kept available but unused for backward compatibility / fast rollback)
 import { buildCompetitorProfile } from './profileBuilder.js';
 import { SCORING_VERSION as SCORING_VERSION_V2 } from './scoringConfig.js';
@@ -194,11 +195,22 @@ export async function runSimulation(scenario) {
     context: yourCompanyInput.context,
   };
 
+  // ── LLM Intent pre-pass: extract strategic intent for all parties in parallel
+  // (keeps buildCompetitorProfileV2 synchronous while using the richer LLM extraction)
+  const intentResults = await Promise.all([
+    ...rawCompetitors.map(raw =>
+      extractStrategicIntent(raw.ceoPriorityStatement, raw.recentNewsSignals, { anthropicClient: anthropic, model: COMPETITOR_MODEL })
+    ),
+    extractStrategicIntent(yourCompany.ceoPriorityStatement, yourCompany.recentNewsSignals, { anthropicClient: anthropic, model: COMPETITOR_MODEL }),
+  ]);
+  const yourCompanyIntent = intentResults[intentResults.length - 1];
+  const competitorIntents = intentResults.slice(0, rawCompetitors.length);
+
   // Build v2 competitor profiles, passing yourCompany for relative firepower
-  const competitors = rawCompetitors.map(raw => buildCompetitorProfileV2(raw, yourCompany));
+  const competitors = rawCompetitors.map((raw, i) => buildCompetitorProfileV2(raw, yourCompany, competitorIntents[i]));
 
   // Build a v2 profile for yourCompany too (same scoring as competitors, for relative firepower + orchestrator)
-  const yourCompanyProfile = buildCompetitorProfileV2(yourCompany, yourCompany);
+  const yourCompanyProfile = buildCompetitorProfileV2(yourCompany, yourCompany, yourCompanyIntent);
 
   const triggerMessage = buildTriggerMessage(yourCompanyInput);
   const triggerEvent = `${yourCompanyInput.name} has announced: ${yourCompanyInput.strategicMove}`;

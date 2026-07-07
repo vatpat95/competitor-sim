@@ -42,7 +42,7 @@ function scoreRhetoric(text) {
  * Scores each of 4 dimensions independently 0–100.
  * Handles negation (roughly) and doesn't normalize to sum to 1.
  */
-function scoreStrategicIntentKeywordFallback(ceoPriorityStatement, recentNewsSignals) {
+export function scoreStrategicIntentKeywordFallback(ceoPriorityStatement, recentNewsSignals) {
   const text = (ceoPriorityStatement || '') + ' ' + (recentNewsSignals || []).join(' ');
   const lower = text.toLowerCase();
 
@@ -406,7 +406,7 @@ function buildProseSummaries(
  * @param {Object} yourCompany - Your company's data (needed for relative firepower)
  * @returns {Object} - Scored profile with all v2 outputs
  */
-export function buildCompetitorProfileV2(rawInputs, yourCompany) {
+export function buildCompetitorProfileV2(rawInputs, yourCompany, precomputedIntent = null) {
   const {
     name,
     revenueGrowthRate,
@@ -502,7 +502,9 @@ export function buildCompetitorProfileV2(rawInputs, yourCompany) {
   const ownershipSpeedPenalty = config.OWNERSHIP_SPEED_PENALTY[ownershipType] ?? false;
 
   // ── STRATEGIC INTENT VECTOR ────────────────────────────────────────────
-  const intent = scoreStrategicIntentKeywordFallback(ceoPriorityStatement, recentNewsSignals);
+  // Use precomputed LLM intent if provided (injected from agents.js pre-pass).
+  // Falls back to keyword scoring if not provided (e.g. frontend live scorecard).
+  const intent = precomputedIntent ?? scoreStrategicIntentKeywordFallback(ceoPriorityStatement, recentNewsSignals);
 
   // ── PREDICTED REACTION PROFILE ─────────────────────────────────────────
   const predictedReactionProfile = buildPredictedReactionProfile(
